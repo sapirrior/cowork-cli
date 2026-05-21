@@ -24,7 +24,7 @@ export default async function runQuery(client, config, query) {
   } catch (err) {
     logger.error(`\nError during AI execution: ${err.message}`);
     if (err.status === 401) {
-      logger.secondary("Tip: Check if your API key is correct in 'btw --config'.");
+      logger.secondary("Tip: Check if your API key is correct in your ~/.env file.");
     } else if (err.status === 404) {
       logger.secondary("Tip: The specified model or base URL might be incorrect.");
     }

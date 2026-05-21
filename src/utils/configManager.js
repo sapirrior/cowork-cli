@@ -1,41 +1,41 @@
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import os from 'os';
+import dotenv from 'dotenv';
 import { logger } from './logger.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CONFIG_PATH = path.join(__dirname, '../configs/user.json');
+const CONFIG_PATH = path.join(os.homedir(), '.env');
 
 /**
- * Loads the user configuration from the JSON file.
+ * Loads the user configuration from ~/.env file.
  * @returns {Object|null} The configuration object or null if it doesn't exist or is invalid.
  */
 export const loadConfig = () => {
   try {
     if (fs.existsSync(CONFIG_PATH)) {
-      const data = fs.readFileSync(CONFIG_PATH, 'utf8');
-      return JSON.parse(data);
+      const content = fs.readFileSync(CONFIG_PATH, 'utf8');
+      const envConfig = dotenv.parse(content);
+      
+      const config = {
+        model_name: envConfig.BTW_MODEL_NAME || envConfig.MODEL_NAME,
+        model_url: envConfig.BTW_MODEL_URL || envConfig.MODEL_URL,
+        model_api_key: envConfig.BTW_MODEL_API_KEY || envConfig.MODEL_API_KEY,
+        model_type: envConfig.BTW_MODEL_TYPE || envConfig.MODEL_TYPE
+      };
+
+      // Remove undefined/empty values
+      const filteredConfig = Object.fromEntries(
+        Object.entries(config).filter(([_, v]) => v !== undefined && v !== '')
+      );
+
+      if (Object.keys(filteredConfig).length > 0) {
+        return filteredConfig;
+      }
     }
   } catch (err) {
-    logger.error(`Error loading configuration: ${err.message}`);
+    logger.error(`Error loading configuration from ~/.env: ${err.message}`);
   }
   return null;
-};
-
-/**
- * Saves the user configuration to the JSON file.
- * @param {Object} config The configuration object to save.
- */
-export const saveConfig = (config) => {
-  try {
-    const configDir = path.dirname(CONFIG_PATH);
-    if (!fs.existsSync(configDir)) {
-      fs.mkdirSync(configDir, { recursive: true });
-    }
-    fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8');
-  } catch (err) {
-    throw new Error(`Error saving configuration: ${err.message}`);
-  }
 };
 
 /**

@@ -19,11 +19,9 @@ The project follows a modular and hardened structure:
 - **`src/utils/`**: Helper functions and management.
     - `ui.js`: Manages terminal animations (spinners) and cursor visibility.
     - `logger.js`: Centralized utility for colorized truecolor ANSI output.
-    - `configManager.js`: Centralized utility for loading/saving configuration.
+    - `configManager.js`: Centralized utility for loading configuration from `~/.env`.
     - `helpMsg.js`: Colorized CLI help interface.
-    - `setConfig.js`: Interactive prompt for API settings.
-- **`src/configs/`**: Stores local configuration.
-    - `user.json`: Stores model settings (ignored by git/npm).
+- **`src/configs/`**: Stores static configuration.
     - `config.json`: Defines the UI theme and accent colors.
 
 ## Features
@@ -51,10 +49,12 @@ npm install
 ```
 
 ### Configuration
-Before using the tool, you must configure your API settings:
-```bash
-# Set up model, URL, key, and provider type
-btw --config
+Before using the tool, you must manually configure your API settings in your `~/.env` file:
+```env
+BTW_MODEL_NAME=your-model-name
+BTW_MODEL_URL=your-model-base-url
+BTW_MODEL_API_KEY=your-api-key
+BTW_MODEL_TYPE=openai-or-gemini
 ```
 
 ### Usage
@@ -71,7 +71,7 @@ btw --help
 - **Module System**: Uses ES Modules.
 - **UI & Logging**: Use `src/utils/ui.js` for animations and `src/utils/logger.js` for console output.
 - **Stability**: Ensure all async operations are wrapped in the top-level CLI error boundary.
-- **Security**: Never commit `src/configs/user.json`. It is strictly ignored via `.gitignore` and `.npmignore`.
+- **Security**: Never commit secrets. Users are responsible for managing their `~/.env` file.
 
 ## TODOs / Known Issues
 - Add unit tests for tool implementations and history logic.
