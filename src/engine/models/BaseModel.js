@@ -32,8 +32,12 @@ export default class BaseModel {
   /**
    * Main execution loop for the model query.
    * @param {string} query The user input.
+   * @param {string|null} systemPrompt Optional system-level instructions.
    */
-  async run(query) {
+  async run(query, systemPrompt = null) {
+    if (systemPrompt) {
+      this.addMessage('system', systemPrompt);
+    }
     this.addMessage('user', query);
     
     let turn = 0;

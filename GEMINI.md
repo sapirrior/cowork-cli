@@ -28,6 +28,8 @@ The project is built with a focus on modularity, error resilience, and terminal 
     - **Safe File I/O**: `readFile` (1MB limit) and `readFileChunk` (range-based) include binary detection and async safety.
     - **Secure Web Fetching**: `webFetch` includes SSRF protection (blocking private IPs), HTML stripping, and strict timeouts.
 - **Polished CLI Experience**:
+    - **Terminal-Optimized**: A dynamic system prompt enforces plain-text structure, skipping Markdown to ensure clean rendering in all terminal environments.
+    - **Context Injection**: Automatically injects `${folder}` (CWD) and `${year}` into the AI's system context for grounded responses.
     - **Tight UI**: Zero-whitespace design for a high-density, professional terminal feel.
     - **Transparent Tooling**: Bracketed, unindented tool logs provide clear visibility into AI actions without clutter.
 - **Robustness by Default**:
