@@ -9,11 +9,11 @@ export const toolDefinitions = [
     type: "function",
     function: {
       name: "readFile",
-      description: "Read the entire content of a file.",
+      description: "Read a file's full content. Best for files <1MB.",
       parameters: {
         type: "object",
         properties: {
-          filePath: { type: "string", description: "The path to the file to read." }
+          filePath: { type: "string", description: "Path to the file." }
         },
         required: ["filePath"]
       }
@@ -23,11 +23,11 @@ export const toolDefinitions = [
     type: "function",
     function: {
       name: "readDir",
-      description: "List the contents of a directory (files and folders).",
+      description: "List directory contents, including types (DIR/FILE).",
       parameters: {
         type: "object",
         properties: {
-          dirPath: { type: "string", description: "The path to the directory to list." }
+          dirPath: { type: "string", description: "Path to the directory." }
         },
         required: ["dirPath"]
       }
@@ -37,13 +37,13 @@ export const toolDefinitions = [
     type: "function",
     function: {
       name: "readFileChunk",
-      description: "Read a specific range of lines from a file.",
+      description: "Read specific line ranges. Ideal for large files.",
       parameters: {
         type: "object",
         properties: {
-          filePath: { type: "string", description: "The path to the file." },
-          startLine: { type: "number", description: "The 1-based start line." },
-          endLine: { type: "number", description: "The 1-based end line (inclusive)." }
+          filePath: { type: "string", description: "Path to the file." },
+          startLine: { type: "number", description: "1-based start line." },
+          endLine: { type: "number", description: "1-based end line (inclusive)." }
         },
         required: ["filePath", "startLine", "endLine"]
       }
@@ -53,13 +53,13 @@ export const toolDefinitions = [
     type: "function",
     function: {
       name: "searchText",
-      description: "Search for a pattern in a file or directory. Supports optional recursive searching and respects common ignore rules.",
+      description: "Regex search in files/folders. Supports recursion and .gitignore.",
       parameters: {
         type: "object",
         properties: {
-          pattern: { type: "string", description: "The regex or text pattern to search for." },
-          path: { type: "string", description: "The path to the file or directory to search." },
-          recursive: { type: "boolean", description: "Whether to search subdirectories recursively. Defaults to false." }
+          pattern: { type: "string", description: "Regex or text pattern." },
+          path: { type: "string", description: "File or directory to search." },
+          recursive: { type: "boolean", description: "Search subdirectories? (default: false)" }
         },
         required: ["pattern", "path"]
       }
@@ -69,11 +69,11 @@ export const toolDefinitions = [
     type: "function",
     function: {
       name: "webFetch",
-      description: "Fetch the text content of a URL. Useful for reading documentation or API responses. Automatically strips HTML tags and scripts.",
+      description: "Fetch and clean text from a URL. Ideal for docs/APIs.",
       parameters: {
         type: "object",
         properties: {
-          url: { type: "string", description: "The full URL to fetch (must include http/https)." }
+          url: { type: "string", description: "Full HTTP/HTTPS URL." }
         },
         required: ["url"]
       }
