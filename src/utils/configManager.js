@@ -46,5 +46,26 @@ export const loadConfig = () => {
 export const validateConfig = (config) => {
   if (!config) return false;
   const requiredKeys = ['model_name', 'model_url', 'model_api_key', 'model_type'];
-  return requiredKeys.every(key => config[key] && config[key].trim() !== '');
+  const hasAllKeys = requiredKeys.every(key => config[key] && config[key].trim() !== '');
+  
+  if (!hasAllKeys) return false;
+
+  const validTypes = ['openai', 'gemini'];
+  return validTypes.includes(config.model_type.toLowerCase());
+};
+
+/**
+ * Verifies the connectivity and credentials by listing models.
+ * @param {Object} client The initialized OpenAI client.
+ * @returns {Promise<boolean>} True if connectivity is verified, false otherwise.
+ */
+export const verifyConnectivity = async (client) => {
+  try {
+    // This call verifies both the API Key and the Base URL
+    await client.models.list();
+    return true;
+  } catch (err) {
+    logger.error(`Connection verification failed: ${err.message}`);
+    return false;
+  }
 };

@@ -1,0 +1,6 @@
+{
+  "model_name": "gemini-2.5-flash",
+  "model_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+  "model_api_key": "AIzaSyDgd4xODbmopFCEFutssVlPC4c6PH5i5ag",
+  "model_type": "gemini"
+}

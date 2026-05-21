@@ -1,7 +1,8 @@
 import show_help from "./utils/helpMsg.js";
 import clientLoader from "./engine/client.js";
 import runQuery from "./engine/run.js";
-import { loadConfig } from "./utils/configManager.js";
+import { loadConfig, verifyConnectivity } from "./utils/configManager.js";
+import { logger } from "./utils/logger.js";
 
 /**
  * Main entry point for the btw CLI.
@@ -18,8 +19,15 @@ export default async function main(args) {
   const query = args[0];
   const config = loadConfig();
 
-  // clientLoader handles config validation and exit if invalid
+  // clientLoader handles config validation and throws if invalid
   const client = clientLoader();
   
+  // Silent connectivity check: logs only on failure
+  const isConnected = await verifyConnectivity(client);
+  if (!isConnected) {
+    process.exitCode = 1;
+    return;
+  }
+
   await runQuery(client, config, query);
 }
