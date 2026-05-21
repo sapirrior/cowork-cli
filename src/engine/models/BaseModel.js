@@ -57,7 +57,9 @@ export default class BaseModel {
 
         // Exit loop if no tool calls are requested
         if (!message.tool_calls || message.tool_calls.length === 0) {
-          process.stdout.write("\n\n");
+          if (message.content && !message.content.endsWith('\n')) {
+            process.stdout.write("\n");
+          }
           return;
         }
 
@@ -73,20 +75,20 @@ export default class BaseModel {
         spinner.stop();
         // Deep error logging for API failures
         if (err.status) {
-          logger.error(`\n[API Error] Status: ${err.status}`);
+          logger.error(`[API Error] Status: ${err.status}`);
           if (err.response?.data) {
              logger.error(`[API Error] Details: ${JSON.stringify(err.response.data)}`);
           }
         } else if (err.name === 'AbortError' || err.message.includes('timeout')) {
-          logger.error(`\n[Timeout Error]: The AI took too long to respond (60s).`);
+          logger.error(`[Timeout Error]: The AI took too long to respond (60s).`);
         } else {
-          logger.error(`\n[Error]: ${err.message}`);
+          logger.error(`[Error]: ${err.message}`);
         }
         throw err;
       }
     }
 
-    logger.secondary("\n[System]: Reached maximum conversation turns. Ending session.");
+    logger.secondary("[System]: Reached maximum conversation turns. Ending session.");
   }
 
   /**
@@ -184,10 +186,10 @@ export default class BaseModel {
         else displayArg = JSON.stringify(args);
 
         const displayStr = displayArg.length > 60 ? displayArg.slice(0, 57) + "..." : displayArg;
-        logger.secondary(`  [${name}] ${displayStr}`);
+        logger.secondary(`[${name}] ${displayStr}`);
         
         // 2. Safe Dispatch & Execution with Spinner
-        spinner.start(`  [${name}] Executing`);
+        spinner.start(`[${name}] Executing`);
         const result = await dispatchTool(name, args);
         spinner.stop();
 
@@ -196,7 +198,7 @@ export default class BaseModel {
       } catch (err) {
         spinner.stop();
         const errorMsg = err.message;
-        logger.error(`  [FAILED] ${name}: ${errorMsg}`);
+        logger.error(`[FAILED] ${name}: ${errorMsg}`);
         
         // 3. Model Recovery: Feed the error back to the model
         this.addMessage('tool', `Error: ${errorMsg}`, { tool_call_id: toolCall.id });

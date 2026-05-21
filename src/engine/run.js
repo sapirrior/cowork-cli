@@ -22,7 +22,7 @@ export default async function runQuery(client, config, query) {
 
     await modelHandler.run(query);
   } catch (err) {
-    logger.error(`\nError during AI execution: ${err.message}`);
+    logger.error(`Error during AI execution: ${err.message}`);
     if (err.status === 401) {
       logger.secondary("Tip: Check if your API key is correct in your ~/.env file.");
     } else if (err.status === 404) {

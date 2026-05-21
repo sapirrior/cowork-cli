@@ -1,7 +1,6 @@
 import { formatMain, formatSecondary, formatNormal } from './logger.js';
 
-const helpMsg = `
-${formatMain('btw - Ask AI from your terminal')}
+const helpMsg = `${formatMain('btw - Ask AI from your terminal')}
 
 ${formatSecondary('Usage:')}
   ${formatNormal('btw <query>           Ask a question to your configured AI model.')}
@@ -16,8 +15,7 @@ ${formatSecondary('Configuration:')}
   ${formatNormal('  BTW_MODEL_NAME=gpt-4')}
   ${formatNormal('  BTW_MODEL_URL=https://api.openai.com/v1')}
   ${formatNormal('  BTW_MODEL_API_KEY=your_key_here')}
-  ${formatNormal('  BTW_MODEL_TYPE=openai')}
-`;
+  ${formatNormal('  BTW_MODEL_TYPE=openai')}`;
 
 export default function show_help() {
   console.log(helpMsg);
