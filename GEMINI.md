@@ -33,7 +33,8 @@ The project follows a modular and hardened structure:
     - **Safe Web Fetching**: `webFetch` tool for reading documentation/APIs with built-in SSRF protection (blocks private/reserved IPs), 10s timeouts, and aggressive HTML stripping to minimize context usage.
 - **Visual Feedback**: Includes a minimalist text-based "thinking" animation and clean, bracketed tool execution logs (no emojis or symbols).
 - **Robustness**: 
-    - **Exponential Backoff**: Automatically retries transient API errors (429, 5xx).
+    - **Advanced Retries**: Automatically retries transient API errors (429, 5xx) using exponential backoff with jitter and strict adherence to `Retry-After` headers.
+    - **Proactive Throttling**: Enforces a minimum delay between API requests to prevent rapid-fire tool-calling loops from triggering rate limits.
     - **Error Recovery**: Self-correcting tool-calling loop that feeds execution errors back to the model.
     - **Clean Exits**: Uses `process.exitCode` for reliable stream flushing and signal handling for Ctrl+C.
 - **Gemini Support**: Full support for Gemini models via OpenAI-compatible APIs, including mandatory `thought_signature` handling.

@@ -16,6 +16,7 @@ export default class BaseModel {
     this.model = model;
     this.messages = [];
     this.maxTurns = 15; // Safeguard against infinite tool-calling loops
+    this.lastRequestTime = 0; // For proactive throttling
   }
 
   /**
@@ -94,23 +95,58 @@ export default class BaseModel {
    */
   async _getCompletion() {
     let retries = 0;
-    const maxRetries = 3;
+    const maxRetries = 5;
+    const minDelayBetweenRequests = 1000; // 1s proactive throttle
     
     while (retries <= maxRetries) {
       try {
-        return await this.client.chat.completions.create({
+        // 1. Proactive Throttling
+        const now = Date.now();
+        const timeSinceLastRequest = now - this.lastRequestTime;
+        if (timeSinceLastRequest < minDelayBetweenRequests) {
+          const waitTime = minDelayBetweenRequests - timeSinceLastRequest;
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+
+        const response = await this.client.chat.completions.create({
           model: this.model,
           messages: this.messages,
           tools: toolDefinitions,
           tool_choice: "auto"
         });
+
+        // Update last request time on successful response
+        this.lastRequestTime = Date.now();
+        return response;
+
       } catch (err) {
         const isTransient = [429, 500, 502, 503, 504].includes(err.status);
         if (isTransient && retries < maxRetries) {
           retries++;
-          const delay = Math.pow(2, retries) * 1000;
-          spinner.update(`Error ${err.status}. Retrying in ${delay/1000}s`);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          
+          let delay = Math.pow(2, retries) * 1000;
+          
+          // 2. Adhere to Retry-After header if present
+          const retryAfter = err.headers?.['retry-after'];
+          if (retryAfter) {
+            const seconds = parseInt(retryAfter);
+            if (!isNaN(seconds)) {
+              delay = seconds * 1000;
+            } else {
+              // Handle Date string
+              const retryDate = new Date(retryAfter);
+              if (!isNaN(retryDate.getTime())) {
+                delay = Math.max(0, retryDate.getTime() - Date.now());
+              }
+            }
+          }
+
+          // 3. Apply Jitter (randomness to prevent thundering herd)
+          const jitter = Math.random() * 500;
+          const finalDelay = delay + jitter;
+
+          spinner.update(`Error ${err.status}. Retrying in ${(finalDelay/1000).toFixed(1)}s`);
+          await new Promise(resolve => setTimeout(resolve, finalDelay));
           spinner.update("Thinking");
           continue;
         }
