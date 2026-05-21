@@ -12,13 +12,13 @@ export default async function main(args) {
   // Handle empty arguments or help flags
   if (args.length === 0 || args[0] === '-h' || args[0] === '--help') {
     show_help();
-    process.exit(0);
+    return;
   }
 
   // Handle configuration flag
   if (args[0] === '-c' || args[0] === '--config') {
     await setup_config();
-    process.exit(0);
+    return;
   }
 
   // Handle query execution
@@ -29,5 +29,4 @@ export default async function main(args) {
   const client = clientLoader();
   
   await runQuery(client, config, query);
-  process.exit(0);
 }

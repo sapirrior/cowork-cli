@@ -5,7 +5,19 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const configPath = path.join(__dirname, '../configs/config.json');
 
-const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+let config;
+try {
+  config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+} catch (e) {
+  // Fallback config if file is missing or invalid
+  config = {
+    accents: {
+      orangex: "#D97757",
+      greyx: "#808080",
+      resetx: "#FFFFFF"
+    }
+  };
+}
 
 function hexToAnsi(hex) {
   const r = parseInt(hex.slice(1, 3), 16);

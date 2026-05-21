@@ -34,8 +34,7 @@ export const saveConfig = (config) => {
     }
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8');
   } catch (err) {
-    logger.error(`Error saving configuration: ${err.message}`);
-    process.exit(1);
+    throw new Error(`Error saving configuration: ${err.message}`);
   }
 };
 

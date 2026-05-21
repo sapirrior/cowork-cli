@@ -6,31 +6,35 @@
 
 The project follows a modular and hardened structure:
 
-- **`bin/cli.js`**: The executable entry point for the CLI with global error boundaries.
+- **`bin/cli.js`**: The executable entry point for the CLI with global error boundaries and cursor management.
 - **`src/main.js`**: Orchestrates the flow and handles top-level commands.
 - **`src/engine/`**: Core logic for AI interaction.
     - **`models/`**: Manages conversation history and the tool-calling loop.
-        - `BaseModel.js`: Base class for history management.
+        - `BaseModel.js`: Base class for history management, exponential backoff, and robust tool execution.
         - `default.js`: Standard OpenAI-compatible handler.
         - `gemini.js`: Specialized handler for Gemini `thought_signature` preservation.
     - **`tools/`**: Built-in capabilities for the AI (e.g., `readFile`, `readDir`, `searchText`).
     - `client.js`: Manages OpenAI client initialization and URL normalization.
     - `run.js`: Instantiates the correct model handler based on configuration.
 - **`src/utils/`**: Helper functions and management.
+    - `ui.js`: Manages terminal animations (spinners) and cursor visibility.
     - `logger.js`: Centralized utility for colorized truecolor ANSI output.
     - `configManager.js`: Centralized utility for loading/saving configuration.
     - `helpMsg.js`: Colorized CLI help interface.
-    - `setConfig.js`: Interactive prompt for API settings (now includes `model_type`).
+    - `setConfig.js`: Interactive prompt for API settings.
 - **`src/configs/`**: Stores local configuration.
-    - `user.json`: Stores model settings, including the explicit `model_type`.
+    - `user.json`: Stores model settings (ignored by git/npm).
     - `config.json`: Defines the UI theme and accent colors.
 
 ## Features
 
-- **Tool Calling**: The AI can autonomously read files, list directories, and search for text to provide better context-aware answers.
+- **Tool Calling**: The AI can autonomously read files, list directories, and search for text to provide context-aware answers.
+- **Visual Feedback**: Includes a Unicode "thinking" spinner and clean, bulleted tool execution logs.
+- **Robustness**: 
+    - **Exponential Backoff**: Automatically retries transient API errors (429, 5xx).
+    - **Error Recovery**: Self-correcting tool-calling loop that feeds execution errors back to the model.
+    - **Clean Exits**: Uses `process.exitCode` for reliable stream flushing and signal handling for Ctrl+C.
 - **Gemini Support**: Full support for Gemini models via OpenAI-compatible APIs, including mandatory `thought_signature` handling.
-- **Colorized UI**: High-contrast, colorized terminal output using hex-to-ANSI conversion.
-- **Explicit Model Types**: Configure your provider type (e.g., `openai`, `gemini`) to ensure correct protocol handling.
 
 ## Building and Running
 
@@ -62,9 +66,9 @@ btw --help
 ## Development Conventions
 
 - **Module System**: Uses ES Modules.
-- **Logging**: Always use `src/utils/logger.js` for console output.
-- **Tool Development**: New tools should be added to `src/engine/tools/` and registered in `src/engine/tools/index.js`.
-- **Model Handling**: Provider-specific logic belongs in `src/engine/models/`.
+- **UI & Logging**: Use `src/utils/ui.js` for animations and `src/utils/logger.js` for console output.
+- **Stability**: Ensure all async operations are wrapped in the top-level CLI error boundary.
+- **Security**: Never commit `src/configs/user.json`. It is strictly ignored via `.gitignore` and `.npmignore`.
 
 ## TODOs / Known Issues
 - Add unit tests for tool implementations and history logic.

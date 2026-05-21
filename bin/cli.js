@@ -11,14 +11,23 @@ import { logger } from "../src/utils/logger.js";
 
 // Catch unhandled promise rejections
 process.on('unhandledRejection', (reason) => {
+  process.stdout.write('\x1b[?25h'); // Restore cursor
   logger.error(`\n[Fatal] Unhandled Rejection: ${reason instanceof Error ? reason.message : reason}`);
-  process.exit(1);
+  process.exitCode = 1;
 });
 
 // Catch uncaught exceptions
 process.on('uncaughtException', (err) => {
+  process.stdout.write('\x1b[?25h'); // Restore cursor
   logger.error(`\n[Fatal] Uncaught Exception: ${err.message}`);
-  process.exit(1);
+  process.exitCode = 1;
+});
+
+// Graceful exit on interrupt
+process.on('SIGINT', () => {
+  process.stdout.write('\x1b[?25h'); // Restore cursor
+  logger.secondary('\nProcess interrupted by user.');
+  process.exit(130);
 });
 
 async function run() {
@@ -27,7 +36,7 @@ async function run() {
     await main(process.argv.slice(2));
   } catch (err) {
     logger.error(`\n[Error]: ${err.message}`);
-    process.exit(1);
+    process.exitCode = 1;
   }
 }
 

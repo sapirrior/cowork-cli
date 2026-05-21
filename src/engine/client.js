@@ -10,8 +10,7 @@ function clientLoader() {
   const config = loadConfig();
   
   if (!validateConfig(config)) {
-    logger.error("Configuration missing or invalid. Please run 'btw --config' first.");
-    process.exit(1);
+    throw new Error("Configuration missing or invalid. Please run 'btw --config' first.");
   }
 
   // Normalize baseURL: remove trailing slashes as the SDK appends paths starting with /
