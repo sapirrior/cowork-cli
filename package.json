@@ -1,0 +1,30 @@
+{
+  "name": "lets-ask-btw",
+  "version": "0.0.1",
+  "description": "the btw tool",
+  "bin": {
+    "btw": "./bin/cli.js"
+  },
+  "keywords": [
+    "cli",
+    "ai"
+  ],
+  "homepage": "https://github.com/sapirrior/lets-ask-btw#readme",
+  "bugs": {
+    "url": "https://github.com/sapirrior/lets-ask-btw/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sapirrior/lets-ask-btw.git"
+  },
+  "license": "MIT",
+  "author": "nolan stark",
+  "type": "module",
+  "main": "./src/main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "openai": "^6.38.0"
+  }
+}

@@ -1,0 +1,22 @@
+import { OpenAI } from 'openai';
+import { loadConfig, validateConfig } from '../utils/configManager.js';
+
+/**
+ * Initializes and returns an OpenAI client instance.
+ * @returns {OpenAI} An instance of the OpenAI client.
+ */
+function clientLoader() {
+  const config = loadConfig();
+  
+  if (!validateConfig(config)) {
+    console.error("Configuration missing or invalid. Please run 'btw --config' first.");
+    process.exit(1);
+  }
+
+  return new OpenAI({
+    apiKey: config.model_api_key,
+    baseURL: config.model_url
+  });
+}
+
+export default clientLoader;
