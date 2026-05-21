@@ -40,7 +40,7 @@ export default class BaseModel {
       turn++;
       
       try {
-        spinner.start("Thinking...");
+        spinner.start("Thinking");
         const response = await this._getCompletion();
         spinner.stop();
 
@@ -60,6 +60,11 @@ export default class BaseModel {
           return;
         }
 
+        // Add a newline if content was printed but tool calls follow
+        if (message.content && !message.content.endsWith('\n')) {
+          process.stdout.write('\n');
+        }
+
         // Execute and record tool calls
         await this._processToolCalls(message.tool_calls);
 
@@ -71,6 +76,10 @@ export default class BaseModel {
           if (err.response?.data) {
              logger.error(`[API Error] Details: ${JSON.stringify(err.response.data)}`);
           }
+        } else if (err.name === 'AbortError' || err.message.includes('timeout')) {
+          logger.error(`\n[Timeout Error]: The AI took too long to respond (60s).`);
+        } else {
+          logger.error(`\n[Error]: ${err.message}`);
         }
         throw err;
       }
@@ -100,8 +109,9 @@ export default class BaseModel {
         if (isTransient && retries < maxRetries) {
           retries++;
           const delay = Math.pow(2, retries) * 1000;
-          spinner.update(`Error ${err.status}. Retrying in ${delay/1000}s...`);
+          spinner.update(`Error ${err.status}. Retrying in ${delay/1000}s`);
           await new Promise(resolve => setTimeout(resolve, delay));
+          spinner.update("Thinking");
           continue;
         }
         throw err;
@@ -129,15 +139,19 @@ export default class BaseModel {
         // Clean tool logging
         const argsStr = JSON.stringify(args);
         const displayArgs = argsStr.length > 60 ? argsStr.slice(0, 57) + "..." : argsStr;
-        logger.secondary(`  ♦ ${name}(${displayArgs})`);
+        logger.secondary(`  [${name}] ${displayArgs}`);
         
-        // 2. Safe Dispatch & Execution
+        // 2. Safe Dispatch & Execution with Spinner
+        spinner.start(`  [${name}] Executing`);
         const result = await dispatchTool(name, args);
+        spinner.stop();
+
         this.addMessage('tool', result, { tool_call_id: toolCall.id });
 
       } catch (err) {
+        spinner.stop();
         const errorMsg = err.message;
-        logger.error(`  ✖ Tool Failure [${name}]: ${errorMsg}`);
+        logger.error(`  [FAILED] ${name}: ${errorMsg}`);
         
         // 3. Model Recovery: Feed the error back to the model
         this.addMessage('tool', `Error: ${errorMsg}`, { tool_call_id: toolCall.id });

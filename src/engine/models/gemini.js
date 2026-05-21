@@ -6,17 +6,12 @@ import BaseModel from './BaseModel.js';
  */
 export default class GeminiModel extends BaseModel {
   /**
-   * Gemini requires the 'thought_signature' to be passed back in the history.
-   * We ensure the message object we store retains these extra fields.
+   * Gemini requires the 'thought_signature' and potentially other metadata
+   * to be passed back in the conversation history for tool-calling turns.
    */
   async handleResponse(message) {
-    // If this is a tool call, we look for the thought signature
-    // In the OpenAI-compatible API, it's often in message.tool_calls[i].extra_content
-    
-    // We store the message as-is. When passing it back to the client,
-    // if the client is the standard OpenAI SDK, it might strip unknown fields.
-    // However, the Gemini API strictly requires them.
-    
+    // We push the full message object to ensure all provider-specific
+    // fields (like thought_signature) are preserved in the history.
     this.messages.push(message);
   }
   

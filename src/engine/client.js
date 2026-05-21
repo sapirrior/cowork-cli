@@ -18,7 +18,8 @@ function clientLoader() {
 
   return new OpenAI({
     apiKey: config.model_api_key,
-    baseURL: baseURL
+    baseURL: baseURL,
+    timeout: 60000 // 60 seconds timeout
   });
 }
 

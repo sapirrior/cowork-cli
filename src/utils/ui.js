@@ -1,11 +1,11 @@
 import { formatSecondary } from './logger.js';
 
 /**
- * A simple terminal spinner for "thinking" animations.
+ * A minimalist terminal spinner that uses text-based dot animations.
  */
 export class Spinner {
   constructor() {
-    this.frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+    this.frames = ['', '.', '..', '...'];
     this.interval = null;
     this.currentFrame = 0;
     this.text = '';
@@ -13,8 +13,7 @@ export class Spinner {
   }
 
   /**
-   * Starts the spinner with a message.
-   * @param {string} text The message to display next to the spinner.
+   * Starts the spinner with a base message.
    */
   start(text) {
     if (this.isSpinning) this.stop(true);
@@ -23,13 +22,13 @@ export class Spinner {
     this.isSpinning = true;
     this.render();
     this.interval = setInterval(() => {
+      this.currentFrame = (this.currentFrame + 1) % this.frames.length;
       this.render();
-    }, 80);
+    }, 400); // Slower interval for dot cycle
   }
 
   /**
-   * Updates the text message without restarting the spinner.
-   * @param {string} text New message.
+   * Updates the base text message.
    */
   update(text) {
     this.text = text;
@@ -38,7 +37,7 @@ export class Spinner {
 
   /**
    * Stops the spinner and restores the cursor.
-   * @param {boolean} clear If true, clears the spinner line. If false, moves to the next line.
+   * @param {boolean} clear If true, clears the entire line.
    */
   stop(clear = true) {
     if (!this.isSpinning) {
@@ -50,18 +49,19 @@ export class Spinner {
     if (clear) {
       process.stdout.write('\r\x1b[K'); // Clear entire line
     } else {
-      process.stdout.write('\n'); // Stay on the current text and move down
+      process.stdout.write('\n'); 
     }
     process.stdout.write('\x1b[?25h'); // Show cursor
+    this.currentFrame = 0;
   }
 
   /**
    * @private
    */
   render() {
-    const frame = this.frames[this.currentFrame];
-    process.stdout.write(`\r${formatSecondary(`${frame} ${this.text}`)}`);
-    this.currentFrame = (this.currentFrame + 1) % this.frames.length;
+    const dots = this.frames[this.currentFrame];
+    // Renders the text followed by the cycling dots
+    process.stdout.write(`\r\x1b[K${formatSecondary(`${this.text}${dots}`)}`);
   }
 }
 
