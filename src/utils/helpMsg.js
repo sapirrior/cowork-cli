@@ -3,7 +3,7 @@ import { formatMain, formatSecondary, formatNormal } from './logger.js';
 const helpMsg = `${formatMain('btw - Ask AI from your terminal')}
 
 ${formatSecondary('Usage:')}
-  ${formatNormal('btw <query>           Ask a question to your configured AI model.')}
+  ${formatNormal('btw "<query>"         Ask a question to your configured AI model.')}
   ${formatNormal('btw -h, --help        Show this help message.')}
 
 ${formatSecondary('Examples:')}

@@ -15,7 +15,7 @@ export default async function main(args) {
   }
 
   // Handle query execution
-  const query = args.join(" ");
+  const query = args[0];
   const config = loadConfig();
 
   // clientLoader handles config validation and exit if invalid

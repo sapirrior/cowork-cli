@@ -59,7 +59,7 @@ BTW_MODEL_TYPE=openai-or-gemini
 
 ### Usage
 ```bash
-# Ask a question (AI can use tools if needed)
+# Ask a question (must be wrapped in quotes)
 btw "Search for 'TODO' in the src folder and summarize them."
 
 # Show help
