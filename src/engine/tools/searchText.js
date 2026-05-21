@@ -3,6 +3,7 @@ import path from 'path';
 
 const MAX_MATCHES_PER_FILE = 20;
 const MAX_TOTAL_MATCHES = 100;
+const MAX_DEPTH = 10;
 const DEFAULT_IGNORES = ['.git', 'node_modules', 'dist', 'build', '.npm'];
 
 /**
@@ -16,6 +17,8 @@ export default async function searchText({ pattern, path: searchPath, recursive 
     const stats = await fs.stat(searchPath);
     let regex;
     try {
+      // Validate pattern is not empty
+      if (!pattern) throw new Error("Search pattern cannot be empty.");
       regex = new RegExp(pattern, 'i');
     } catch (e) {
       return `Error: Invalid regex pattern '${pattern}': ${e.message}`;
@@ -51,8 +54,18 @@ export default async function searchText({ pattern, path: searchPath, recursive 
         isTruncated = true;
         return;
       }
+      
+      if (depth > MAX_DEPTH) {
+        return; // Safety break for extremely deep structures
+      }
 
-      const items = await fs.readdir(currentPath, { withFileTypes: true });
+      let items;
+      try {
+        items = await fs.readdir(currentPath, { withFileTypes: true });
+      } catch (err) {
+        return; // Skip directories that can't be read
+      }
+
       for (const item of items) {
         if (totalMatches >= MAX_TOTAL_MATCHES) {
           isTruncated = true;

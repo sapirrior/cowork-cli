@@ -140,6 +140,7 @@ export default class BaseModel {
         let displayArg = "";
         if (name === 'searchText') displayArg = `'${args.pattern}' in ${args.path}`;
         else if (name === 'readFileChunk') displayArg = `${args.filePath} [${args.startLine}-${args.endLine}]`;
+        else if (args.url) displayArg = args.url;
         else if (args.filePath) displayArg = args.filePath;
         else if (args.dirPath) displayArg = args.dirPath;
         else if (args.path) displayArg = args.path;

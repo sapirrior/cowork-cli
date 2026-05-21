@@ -2,6 +2,7 @@ import readFile from './readFile.js';
 import readDir from './readDir.js';
 import readFileChunk from './readFileChunk.js';
 import searchText from './searchText.js';
+import webFetch from './webFetch.js';
 
 export const toolDefinitions = [
   {
@@ -63,6 +64,20 @@ export const toolDefinitions = [
         required: ["pattern", "path"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "webFetch",
+      description: "Fetch the text content of a URL. Useful for reading documentation or API responses. Automatically strips HTML tags and scripts.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: { type: "string", description: "The full URL to fetch (must include http/https)." }
+        },
+        required: ["url"]
+      }
+    }
   }
 ];
 
@@ -70,7 +85,8 @@ const toolImplementations = {
   readFile,
   readDir,
   readFileChunk,
-  searchText
+  searchText,
+  webFetch
 };
 
 /**

@@ -30,6 +30,7 @@ The project follows a modular and hardened structure:
 
 - **Tool Calling**: The AI can autonomously read files, list directories, and search for text.
     - **Powerful Search**: Supports optional recursion, respects `.gitignore`, automatically skips binary files, and enforces strict context safety limits (max matches per file/total) to prevent context bloat.
+    - **Safe Web Fetching**: `webFetch` tool for reading documentation/APIs with built-in SSRF protection (blocks private/reserved IPs), 10s timeouts, and aggressive HTML stripping to minimize context usage.
 - **Visual Feedback**: Includes a minimalist text-based "thinking" animation and clean, bracketed tool execution logs (no emojis or symbols).
 - **Robustness**: 
     - **Exponential Backoff**: Automatically retries transient API errors (429, 5xx).
