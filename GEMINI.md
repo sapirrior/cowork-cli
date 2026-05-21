@@ -1,27 +1,41 @@
 # Project Overview: lets-ask-btw
 
-`lets-ask-btw` is a lightweight Node.js CLI tool designed to allow users to ask questions to AI models directly from their terminal. It uses the OpenAI SDK to interface with any OpenAI-compatible API.
+`lets-ask-btw` is a lightweight Node.js CLI tool designed to allow users to ask questions to AI models directly from their terminal. It uses the OpenAI SDK to interface with any OpenAI-compatible API and includes built-in tools for file system interaction.
 
 ## Architecture
 
 The project follows a modular and hardened structure:
 
-- **`bin/cli.js`**: The executable entry point for the CLI.
-- **`src/main.js`**: The main application logic that handles command-line arguments and orchestrates the flow.
-- **`src/engine/`**: Contains core logic for AI interaction.
-    - `client.js`: Manages the OpenAI client initialization with configuration validation.
-    - `run.js`: Handles the streaming of AI completions with robust error reporting.
-- **`src/utils/`**: General helper functions and management.
-    - `configManager.js`: Centralized utility for loading, saving, and validating user configuration.
-    - `helpMsg.js`: Defines and displays the CLI help message.
-    - `setConfig.js`: Provides an interactive prompt to configure API keys and model settings.
+- **`bin/cli.js`**: The executable entry point for the CLI with global error boundaries.
+- **`src/main.js`**: Orchestrates the flow and handles top-level commands.
+- **`src/engine/`**: Core logic for AI interaction.
+    - **`models/`**: Manages conversation history and the tool-calling loop.
+        - `BaseModel.js`: Base class for history management.
+        - `default.js`: Standard OpenAI-compatible handler.
+        - `gemini.js`: Specialized handler for Gemini `thought_signature` preservation.
+    - **`tools/`**: Built-in capabilities for the AI (e.g., `readFile`, `readDir`, `searchText`).
+    - `client.js`: Manages OpenAI client initialization and URL normalization.
+    - `run.js`: Instantiates the correct model handler based on configuration.
+- **`src/utils/`**: Helper functions and management.
+    - `logger.js`: Centralized utility for colorized truecolor ANSI output.
+    - `configManager.js`: Centralized utility for loading/saving configuration.
+    - `helpMsg.js`: Colorized CLI help interface.
+    - `setConfig.js`: Interactive prompt for API settings (now includes `model_type`).
 - **`src/configs/`**: Stores local configuration.
-    - `user.json`: Stores the model name, base URL, and API key (managed by `configManager.js`).
+    - `user.json`: Stores model settings, including the explicit `model_type`.
+    - `config.json`: Defines the UI theme and accent colors.
+
+## Features
+
+- **Tool Calling**: The AI can autonomously read files, list directories, and search for text to provide better context-aware answers.
+- **Gemini Support**: Full support for Gemini models via OpenAI-compatible APIs, including mandatory `thought_signature` handling.
+- **Colorized UI**: High-contrast, colorized terminal output using hex-to-ANSI conversion.
+- **Explicit Model Types**: Configure your provider type (e.g., `openai`, `gemini`) to ensure correct protocol handling.
 
 ## Building and Running
 
 ### Prerequisites
-- Node.js (v14+)
+- Node.js (v18+)
 - npm
 
 ### Installation
@@ -32,37 +46,27 @@ npm install
 ### Configuration
 Before using the tool, you must configure your API settings:
 ```bash
-# Using the local script
-node bin/cli.js --config
-
-# Or using the linked command (if npm link is used)
+# Set up model, URL, key, and provider type
 btw --config
 ```
 
 ### Usage
 ```bash
-# Ask a question
-btw "How do I use file operations in Node.js?"
+# Ask a question (AI can use tools if needed)
+btw "Search for 'TODO' in the src folder and summarize them."
 
 # Show help
 btw --help
 ```
 
-### Testing
-There are currently no automated tests implemented.
-```bash
-npm test # Currently placeholder
-```
-
 ## Development Conventions
 
-- **Module System**: Uses ES Modules (`type: "module"` in `package.json`).
-- **Configuration**: Managed centrally via `src/utils/configManager.js`.
-- **Naming**: Follows camelCase for functions and variables.
-- **Error Handling**: Comprehensive try-catch blocks with user-friendly error messages and troubleshooting tips.
-- **Clean Exit**: The process explicitly exits after completing its task to ensure no hanging handles.
+- **Module System**: Uses ES Modules.
+- **Logging**: Always use `src/utils/logger.js` for console output.
+- **Tool Development**: New tools should be added to `src/engine/tools/` and registered in `src/engine/tools/index.js`.
+- **Model Handling**: Provider-specific logic belongs in `src/engine/models/`.
 
 ## TODOs / Known Issues
-- Add unit tests for `configManager.js` and engine logic.
-- Implement more advanced CLI argument parsing (e.g., using `commander` or `yargs`).
-- Add support for multiple profiles/configurations.
+- Add unit tests for tool implementations and history logic.
+- Implement support for multiple profiles/configurations.
+- Add support for interactive chat mode (REPL).

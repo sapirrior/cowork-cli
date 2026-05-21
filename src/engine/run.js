@@ -1,34 +1,26 @@
 import { logger } from '../utils/logger.js';
+import DefaultModel from './models/default.js';
+import GeminiModel from './models/gemini.js';
 
 /**
- * Executes a chat completion query using the provided OpenAI client.
+ * Executes a chat completion query using the appropriate model handler.
  * @param {import('openai').OpenAI} client The initialized OpenAI client.
- * @param {string} model The model identifier to use.
+ * @param {Object} config The user configuration.
  * @param {string} query The user query string.
  */
-export default async function runQuery(client, model, query) {
+export default async function runQuery(client, config, query) {
   if (!query) {
     logger.error("Error: No query provided.");
     return;
   }
 
   try {
-    const stream = await client.chat.completions.create({
-      model: model,
-      messages: [{ role: 'user', content: query }],
-      stream: true,
-    });
+    const isGemini = config.model_type.toLowerCase() === 'gemini';
+    const modelHandler = isGemini 
+      ? new GeminiModel(client, config.model_name) 
+      : new DefaultModel(client, config.model_name);
 
-    console.log(""); // Start with a newline for visual separation
-
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content || "";
-      if (content) {
-        process.stdout.write(content);
-      }
-    }
-
-    process.stdout.write("\n\n");
+    await modelHandler.run(query);
   } catch (err) {
     logger.error(`\nError during AI execution: ${err.message}`);
     if (err.status === 401) {

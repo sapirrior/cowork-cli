@@ -14,9 +14,12 @@ function clientLoader() {
     process.exit(1);
   }
 
+  // Normalize baseURL: remove trailing slashes as the SDK appends paths starting with /
+  const baseURL = config.model_url.replace(/\/+$/, '');
+
   return new OpenAI({
     apiKey: config.model_api_key,
-    baseURL: config.model_url
+    baseURL: baseURL
   });
 }
 

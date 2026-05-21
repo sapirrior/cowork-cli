@@ -24,14 +24,15 @@ export default async function setConfig() {
   const model_name = await ask("1. Enter Model Name (e.g., gpt-4, mistral): ");
   const model_url = await ask("2. Enter Model Base URL (e.g., https://api.openai.com/v1): ");
   const model_api_key = await ask("3. Enter API Key: ");
+  const model_type = await ask("4. Enter Provider/Type (e.g., openai, gemini): ");
 
-  if (!model_name || !model_url || !model_api_key) {
+  if (!model_name || !model_url || !model_api_key || !model_type) {
     logger.error("\nError: All configuration fields are required.");
     rl.close();
     process.exit(1);
   }
 
-  const config = { model_name, model_url, model_api_key };
+  const config = { model_name, model_url, model_api_key, model_type };
   saveConfig(config);
 
   rl.close();

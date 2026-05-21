@@ -28,6 +28,6 @@ export default async function main(args) {
   // clientLoader handles config validation and exit if invalid
   const client = clientLoader();
   
-  await runQuery(client, config.model_name, query);
+  await runQuery(client, config, query);
   process.exit(0);
 }

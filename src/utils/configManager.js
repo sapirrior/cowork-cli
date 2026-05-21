@@ -46,6 +46,6 @@ export const saveConfig = (config) => {
  */
 export const validateConfig = (config) => {
   if (!config) return false;
-  const requiredKeys = ['model_name', 'model_url', 'model_api_key'];
+  const requiredKeys = ['model_name', 'model_url', 'model_api_key', 'model_type'];
   return requiredKeys.every(key => config[key] && config[key].trim() !== '');
 };
