@@ -28,7 +28,8 @@ The project follows a modular and hardened structure:
 
 ## Features
 
-- **Tool Calling**: The AI can autonomously read files, list directories, and search for text to provide context-aware answers.
+- **Tool Calling**: The AI can autonomously read files, list directories, and search for text.
+    - **Powerful Search**: Supports optional recursion, respects `.gitignore`, automatically skips binary files, and enforces strict context safety limits (max matches per file/total) to prevent context bloat.
 - **Visual Feedback**: Includes a minimalist text-based "thinking" animation and clean, bracketed tool execution logs (no emojis or symbols).
 - **Robustness**: 
     - **Exponential Backoff**: Automatically retries transient API errors (429, 5xx).

@@ -52,12 +52,13 @@ export const toolDefinitions = [
     type: "function",
     function: {
       name: "searchText",
-      description: "Search for a pattern in a specific file or folder (non-recursive).",
+      description: "Search for a pattern in a file or directory. Supports optional recursive searching and respects common ignore rules.",
       parameters: {
         type: "object",
         properties: {
           pattern: { type: "string", description: "The regex or text pattern to search for." },
-          path: { type: "string", description: "The path to the file or directory to search." }
+          path: { type: "string", description: "The path to the file or directory to search." },
+          recursive: { type: "boolean", description: "Whether to search subdirectories recursively. Defaults to false." }
         },
         required: ["pattern", "path"]
       }
