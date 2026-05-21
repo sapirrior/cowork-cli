@@ -1,6 +1,7 @@
 import { toolDefinitions, dispatchTool } from '../tools/index.js';
 import { logger } from '../../utils/logger.js';
 import { spinner } from '../../utils/ui.js';
+import { outputFormatted } from '../../utils/outputFormatter.js';
 
 /**
  * Base class for AI model interaction handlers.
@@ -54,22 +55,16 @@ export default class BaseModel {
         // Let subclasses handle/format the response (e.g. Gemini thought signatures)
         await this.handleResponse(message);
 
-        // Output model's text content to terminal
-        if (message.content) {
-          process.stdout.write(message.content);
-        }
-
-        // Exit loop if no tool calls are requested
+        // Exit loop if no tool calls are requested (Final Answer)
         if (!message.tool_calls || message.tool_calls.length === 0) {
-          if (message.content && !message.content.endsWith('\n')) {
-            process.stdout.write("\n");
+          if (message.content) {
+            const formatted = outputFormatted(message.content);
+            process.stdout.write(formatted);
+            if (!formatted.endsWith('\n')) {
+              process.stdout.write("\n");
+            }
           }
           return;
-        }
-
-        // Add a newline if content was printed but tool calls follow
-        if (message.content && !message.content.endsWith('\n')) {
-          process.stdout.write('\n');
         }
 
         // Execute and record tool calls
