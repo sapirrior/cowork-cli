@@ -1,5 +1,6 @@
 import { OpenAI } from 'openai';
 import { loadConfig, validateConfig } from '../utils/configManager.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Initializes and returns an OpenAI client instance.
@@ -9,7 +10,7 @@ function clientLoader() {
   const config = loadConfig();
   
   if (!validateConfig(config)) {
-    console.error("Configuration missing or invalid. Please run 'btw --config' first.");
+    logger.error("Configuration missing or invalid. Please run 'btw --config' first.");
     process.exit(1);
   }
 

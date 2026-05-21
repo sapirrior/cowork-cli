@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger.js';
+
 /**
  * Executes a chat completion query using the provided OpenAI client.
  * @param {import('openai').OpenAI} client The initialized OpenAI client.
@@ -6,7 +8,7 @@
  */
 export default async function runQuery(client, model, query) {
   if (!query) {
-    console.error("Error: No query provided.");
+    logger.error("Error: No query provided.");
     return;
   }
 
@@ -28,11 +30,11 @@ export default async function runQuery(client, model, query) {
 
     process.stdout.write("\n\n");
   } catch (err) {
-    console.error(`\nError during AI execution: ${err.message}`);
+    logger.error(`\nError during AI execution: ${err.message}`);
     if (err.status === 401) {
-      console.error("Tip: Check if your API key is correct in 'btw --config'.");
+      logger.secondary("Tip: Check if your API key is correct in 'btw --config'.");
     } else if (err.status === 404) {
-      console.error("Tip: The specified model or base URL might be incorrect.");
+      logger.secondary("Tip: The specified model or base URL might be incorrect.");
     }
   }
 }

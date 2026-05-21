@@ -1,5 +1,6 @@
 import readline from 'readline';
 import { saveConfig } from './configManager.js';
+import { logger, formatSecondary } from './logger.js';
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -11,21 +12,21 @@ const rl = readline.createInterface({
  * @param {string} query The question to display.
  * @returns {Promise<string>} The user's answer.
  */
-const ask = (query) => new Promise((resolve) => rl.question(query, (answer) => resolve(answer.trim())));
+const ask = (query) => new Promise((resolve) => rl.question(formatSecondary(query), (answer) => resolve(answer.trim())));
 
 /**
  * Orchestrates the interactive configuration process.
  */
 export default async function setConfig() {
-  console.log("\n---- btw Tool Configuration ----");
-  console.log("Please provide your AI model details below.\n");
+  logger.main("\n---- btw Tool Configuration ----");
+  logger.main("Please provide your AI model details below.\n");
 
   const model_name = await ask("1. Enter Model Name (e.g., gpt-4, mistral): ");
   const model_url = await ask("2. Enter Model Base URL (e.g., https://api.openai.com/v1): ");
   const model_api_key = await ask("3. Enter API Key: ");
 
   if (!model_name || !model_url || !model_api_key) {
-    console.error("\nError: All configuration fields are required.");
+    logger.error("\nError: All configuration fields are required.");
     rl.close();
     process.exit(1);
   }
@@ -34,5 +35,5 @@ export default async function setConfig() {
   saveConfig(config);
 
   rl.close();
-  console.log("\nConfiguration successfully updated!\n");
+  logger.main("\nConfiguration successfully updated!\n");
 }

@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { logger } from './logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CONFIG_PATH = path.join(__dirname, '../configs/user.json');
@@ -16,7 +17,7 @@ export const loadConfig = () => {
       return JSON.parse(data);
     }
   } catch (err) {
-    console.error(`Error loading configuration: ${err.message}`);
+    logger.error(`Error loading configuration: ${err.message}`);
   }
   return null;
 };
@@ -33,7 +34,7 @@ export const saveConfig = (config) => {
     }
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8');
   } catch (err) {
-    console.error(`Error saving configuration: ${err.message}`);
+    logger.error(`Error saving configuration: ${err.message}`);
     process.exit(1);
   }
 };
