@@ -1,79 +1,72 @@
-# Project Overview: lets-ask-btw
+# lets-ask-btw 🚀
 
-`lets-ask-btw` is a lightweight Node.js CLI tool designed to allow users to ask questions to AI models directly from their terminal. It uses the OpenAI SDK to interface with any OpenAI-compatible API and includes built-in tools for file system interaction.
+`lets-ask-btw` (`btw`) is a hardened, minimalist Node.js CLI tool for interacting with AI models. It is designed for developers who want a fast, "no-fluff" terminal interface to OpenAI-compatible APIs, including full support for Gemini models.
 
-## Architecture
+## 🏗️ Architecture
 
-The project follows a modular and hardened structure:
+The project is built with a focus on modularity, error resilience, and terminal performance.
 
-- **`bin/cli.js`**: The executable entry point for the CLI with global error boundaries and cursor management.
-- **`src/main.js`**: Orchestrates the flow and handles top-level commands.
-- **`src/engine/`**: Core logic for AI interaction.
-    - **`models/`**: Manages conversation history and the tool-calling loop.
-        - `BaseModel.js`: Base class for history management, exponential backoff, and robust tool execution.
-        - `default.js`: Standard OpenAI-compatible handler.
-        - `gemini.js`: Specialized handler for Gemini `thought_signature` preservation.
-    - **`tools/`**: Built-in capabilities for the AI (e.g., `readFile`, `readDir`, `searchText`).
-    - `client.js`: Manages OpenAI client initialization and URL normalization.
-    - `run.js`: Instantiates the correct model handler based on configuration.
-- **`src/utils/`**: Helper functions and management.
-    - `ui.js`: Manages terminal animations (spinners) and cursor visibility.
-    - `logger.js`: Centralized utility for colorized truecolor ANSI output.
-    - `configManager.js`: Centralized utility for loading configuration from `~/.env`.
-    - `helpMsg.js`: Colorized CLI help interface.
-- **`src/configs/`**: Stores static configuration.
-    - `config.json`: Defines the UI theme and accent colors.
+### Core Components
+- **`bin/cli.js`**: The executable entry point. Manages global error boundaries, cursor state, and graceful signal handling (Ctrl+C).
+- **`src/main.js`**: Orchestrator. Handles initial argument parsing and executes the silent validation suite.
+- **`src/engine/`**: The "brain" of the application.
+    - **`models/`**: State-aware handlers for different AI provider requirements.
+        - `BaseModel.js`: Core logic for history management, exponential backoff, and robust tool execution loops.
+        - `default.js`: Optimized for standard OpenAI-compatible endpoints.
+        - `gemini.js`: Specialized handler for Google Gemini models, preserving the mandatory `thought_signature`.
+    - **`client.js`**: Manages OpenAI client instantiation and URL normalization.
+- **`src/utils/`**: Shared utilities for a consistent DX.
+    - `configManager.js`: Handles global `~/.env` loading and connectivity verification.
+    - `ui.js`: Minimalist, non-intrusive terminal animations (spinners).
+    - `logger.js`: Centralized truecolor ANSI logging with semantic levels.
 
-## Features
+## ✨ Key Features
 
-- **Tool Calling**: The AI can autonomously read files, list directories, and search for text.
-    - **Powerful Search**: Supports optional recursion, respects `.gitignore`, automatically skips binary files, and enforces strict context safety limits (max matches per file/total) to prevent context bloat.
-    - **Safe Web Fetching**: `webFetch` tool for reading documentation/APIs with built-in SSRF protection (blocks private/reserved IPs), 10s timeouts, and aggressive HTML stripping to minimize context usage.
-- **Visual Feedback**: Includes a minimalist text-based "thinking" animation and clean, bracketed tool execution logs (no emojis or symbols).
-- **Robustness**: 
-    - **Advanced Retries**: Automatically retries transient API errors (429, 5xx) using exponential backoff with jitter and strict adherence to `Retry-After` headers.
-    - **Proactive Throttling**: Enforces a minimum delay between API requests to prevent rapid-fire tool-calling loops from triggering rate limits.
-    - **Error Recovery**: Self-correcting tool-calling loop that feeds execution errors back to the model.
-    - **Clean Exits**: Uses `process.exitCode` for reliable stream flushing and signal handling for Ctrl+C.
-- **Gemini Support**: Full support for Gemini models via OpenAI-compatible APIs, including mandatory `thought_signature` handling.
+- **Enforced Context Safety**:
+    - **Smart Search**: The `searchText` tool respects `.gitignore`, skips binary files, and enforces strict match limits to prevent context bloat.
+    - **Secure Web Fetching**: `webFetch` includes SSRF protection (blocking private/reserved IPs), HTML stripping, and strict timeouts.
+- **Polished CLI Experience**:
+    - **Tight UI**: Zero-whitespace design for a high-density, professional terminal feel.
+    - **Transparent Tooling**: Bracketed, unindented tool logs provide clear visibility into AI actions without clutter.
+- **Robustness by Default**:
+    - **Silent Validation**: Every query is preceded by an automatic, silent configuration and connectivity check.
+    - **Advanced Retries**: Implements exponential backoff with jitter and respects `Retry-After` headers for rate-limited APIs.
+    - **Self-Correcting Loop**: Execution errors from tool calls are fed back to the AI for autonomous recovery.
 
-## Building and Running
+## ⚙️ Configuration
 
-### Prerequisites
-- Node.js (v18+)
-- npm
+The tool uses a global configuration system. You must manually manage your settings in a `~/.env` file.
 
-### Installation
-```bash
-npm install
-```
-
-### Configuration
-Before using the tool, you must manually configure your API settings in your `~/.env` file:
 ```env
-BTW_MODEL_NAME=your-model-name
-BTW_MODEL_URL=your-model-base-url
-BTW_MODEL_API_KEY=your-api-key
-BTW_MODEL_TYPE=openai-or-gemini
+# Required Configuration
+BTW_MODEL_NAME=your-model-id          # e.g., gpt-4o or gemini-1.5-pro
+BTW_MODEL_URL=your-api-base-url       # e.g., https://api.openai.com/v1
+BTW_MODEL_API_KEY=your-secret-key
+BTW_MODEL_TYPE=openai                 # Options: 'openai' or 'gemini'
 ```
 
-### Usage
-```bash
-# Ask a question (must be wrapped in quotes)
-btw "Search for 'TODO' in the src folder and summarize them."
+## ⌨️ Usage
 
-# Show help
+The CLI enforces a single-argument query structure for precision. All multi-word queries must be wrapped in double quotes.
+
+```bash
+# General Query
+btw "Explain the architecture of a Node.js stream."
+
+# Tool-Assisted Query
+btw "Search for 'FIXME' in src/ and summarize the technical debt."
+
+# Display Help
 btw --help
 ```
 
-## Development Conventions
+## 🛠️ Development Conventions
 
-- **Module System**: Uses ES Modules.
-- **UI & Logging**: Use `src/utils/ui.js` for animations and `src/utils/logger.js` for console output.
-- **Stability**: Ensure all async operations are wrapped in the top-level CLI error boundary.
-- **Security**: Never commit secrets. Users are responsible for managing their `~/.env` file.
+- **ES Modules**: The entire codebase uses native ESM.
+- **Surgical Logic**: Logic is isolated into small, testable functions. Avoid threading state across unrelated layers.
+- **No Dependencies**: Maintain a minimalist dependency tree (currently only `openai`, `dotenv`, and `ipaddr.js`).
+- **Validation First**: Ensure all new features are preceded by appropriate validation logic in `configManager.js`.
 
-## TODOs / Known Issues
-- Add unit tests for tool implementations and history logic.
-- Implement support for multiple profiles/configurations.
-- Add support for interactive chat mode (REPL).
+---
+
+*“btw... what was that command again?”*
