@@ -136,10 +136,16 @@ export default class BaseModel {
           throw new Error(`Invalid JSON arguments provided for tool '${name}': ${parseErr.message}`);
         }
 
-        // Clean tool logging
-        const argsStr = JSON.stringify(args);
-        const displayArgs = argsStr.length > 60 ? argsStr.slice(0, 57) + "..." : argsStr;
-        logger.secondary(`  [${name}] ${displayArgs}`);
+        // Clean tool logging: Extract primary argument for better readability
+        let displayArg = "";
+        if (args.filePath) displayArg = args.filePath;
+        else if (args.dirPath) displayArg = args.dirPath;
+        else if (args.path) displayArg = args.path;
+        else if (args.pattern) displayArg = args.pattern;
+        else displayArg = JSON.stringify(args);
+
+        const displayStr = displayArg.length > 60 ? displayArg.slice(0, 57) + "..." : displayArg;
+        logger.secondary(`  [${name}] ${displayStr}`);
         
         // 2. Safe Dispatch & Execution with Spinner
         spinner.start(`  [${name}] Executing`);
