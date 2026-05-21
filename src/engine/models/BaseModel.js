@@ -136,9 +136,11 @@ export default class BaseModel {
           throw new Error(`Invalid JSON arguments provided for tool '${name}': ${parseErr.message}`);
         }
 
-        // Clean tool logging: Extract primary argument for better readability
+        // Clean tool logging: Extract primary arguments for better readability
         let displayArg = "";
-        if (args.filePath) displayArg = args.filePath;
+        if (name === 'searchText') displayArg = `'${args.pattern}' in ${args.path}`;
+        else if (name === 'readFileChunk') displayArg = `${args.filePath} [${args.startLine}-${args.endLine}]`;
+        else if (args.filePath) displayArg = args.filePath;
         else if (args.dirPath) displayArg = args.dirPath;
         else if (args.path) displayArg = args.path;
         else if (args.pattern) displayArg = args.pattern;
