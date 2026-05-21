@@ -1,2 +1,7 @@
 node_modules/
 .git/
+.env
+src/configs/user.json
+*.log
+.npmrc
+.DS_Store
