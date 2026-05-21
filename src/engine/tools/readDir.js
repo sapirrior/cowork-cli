@@ -1,4 +1,5 @@
-import fs from 'fs';
+import fs from 'fs/promises';
+import { getIgnorePatterns, shouldIgnore } from '../../utils/fsUtils.js';
 
 /**
  * Implementation of the readDir tool.
@@ -8,9 +9,24 @@ import fs from 'fs';
  */
 export default async function readDir({ dirPath }) {
   try {
-    const items = fs.readdirSync(dirPath);
-    return items.join('\n');
+    const ignoreList = await getIgnorePatterns();
+    const items = await fs.readdir(dirPath, { withFileTypes: true });
+    
+    const formattedItems = items
+      .filter(item => !shouldIgnore(item.name, ignoreList))
+      .map(item => {
+        const type = item.isDirectory() ? '[DIR] ' : '[FILE]';
+        return `${type} ${item.name}`;
+      });
+
+    if (formattedItems.length === 0) {
+      return `Directory '${dirPath}' is empty (or all items are ignored).`;
+    }
+
+    return formattedItems.join('\n');
   } catch (err) {
+    if (err.code === 'ENOENT') return `Error: Directory not found at '${dirPath}'.`;
+    if (err.code === 'ENOTDIR') return `Error: '${dirPath}' is not a directory.`;
     return `Error reading directory: ${err.message}`;
   }
 }
