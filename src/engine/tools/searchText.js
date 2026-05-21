@@ -108,10 +108,10 @@ export default async function searchText({ pattern, path: searchPath, recursive 
 async function searchInFile(filePath, regex) {
   try {
     const handle = await fs.open(filePath, 'r');
-    const { buffer } = await handle.read(Buffer.alloc(1024), 0, 1024, 0);
+    const { bytesRead, buffer } = await handle.read(Buffer.alloc(1024), 0, 1024, 0);
     await handle.close();
     
-    for (let i = 0; i < buffer.length; i++) {
+    for (let i = 0; i < bytesRead; i++) {
       if (buffer[i] === 0) return []; // Skip binary
     }
 

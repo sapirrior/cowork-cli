@@ -23,10 +23,10 @@ export default async function readFile({ filePath }) {
 
     // Binary check: read first 1KB and look for null bytes
     const handle = await fs.open(filePath, 'r');
-    const { buffer } = await handle.read(Buffer.alloc(1024), 0, 1024, 0);
+    const { bytesRead, buffer } = await handle.read(Buffer.alloc(1024), 0, 1024, 0);
     await handle.close();
     
-    for (let i = 0; i < buffer.length; i++) {
+    for (let i = 0; i < bytesRead; i++) {
       if (buffer[i] === 0) {
         return `Error: '${filePath}' appears to be a binary file. Reading binary files is not supported.`;
       }
