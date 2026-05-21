@@ -23,8 +23,10 @@ The project is built with a focus on modularity, error resilience, and terminal 
 ## ✨ Key Features
 
 - **Enforced Context Safety**:
-    - **Smart Search**: The `searchText` tool respects `.gitignore`, skips binary files, and enforces strict match limits to prevent context bloat.
-    - **Secure Web Fetching**: `webFetch` includes SSRF protection (blocking private/reserved IPs), HTML stripping, and strict timeouts.
+    - **Visual Structure**: The `projectTree` tool generates a minimalist directory tree while respecting `.gitignore` patterns.
+    - **Smart Search**: `searchText` supports regex across files/folders with recursion, respects `.gitignore`, and skips binary files.
+    - **Safe File I/O**: `readFile` (1MB limit) and `readFileChunk` (range-based) include binary detection and async safety.
+    - **Secure Web Fetching**: `webFetch` includes SSRF protection (blocking private IPs), HTML stripping, and strict timeouts.
 - **Polished CLI Experience**:
     - **Tight UI**: Zero-whitespace design for a high-density, professional terminal feel.
     - **Transparent Tooling**: Bracketed, unindented tool logs provide clear visibility into AI actions without clutter.

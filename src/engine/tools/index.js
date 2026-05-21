@@ -1,5 +1,6 @@
 import readFile from './readFile.js';
 import readDir from './readDir.js';
+import projectTree from './projectTree.js';
 import readFileChunk from './readFileChunk.js';
 import searchText from './searchText.js';
 import webFetch from './webFetch.js';
@@ -28,6 +29,20 @@ export const toolDefinitions = [
         type: "object",
         properties: {
           dirPath: { type: "string", description: "Path to the directory." }
+        },
+        required: ["dirPath"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "projectTree",
+      description: "Generate a visual directory tree. Respects .gitignore.",
+      parameters: {
+        type: "object",
+        properties: {
+          dirPath: { type: "string", description: "The folder to act as root for the tree." }
         },
         required: ["dirPath"]
       }
@@ -84,6 +99,7 @@ export const toolDefinitions = [
 const toolImplementations = {
   readFile,
   readDir,
+  projectTree,
   readFileChunk,
   searchText,
   webFetch
