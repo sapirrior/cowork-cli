@@ -62,4 +62,4 @@ btw --help
 
 ## License
 
-[MIT](LICENSE) (or specify your license)
+[MIT](LICENSE)
