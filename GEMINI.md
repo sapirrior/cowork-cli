@@ -1,77 +1,69 @@
-# lets-ask-btw 🚀
+# lets-ask-btw (btw) 🚀
 
-`lets-ask-btw` (`btw`) is a hardened, minimalist Node.js CLI tool for interacting with AI models. It is designed for developers who want a fast, "no-fluff" terminal interface to OpenAI-compatible APIs, including full support for Gemini models.
+`lets-ask-btw` (`btw`) is a hardened, minimalist Node.js Developer Analyst tool. It is designed for high-density, context-aware codebase investigation using any OpenAI-compatible API, with first-class support for Gemini 3.1+ models.
 
 ## 🏗️ Architecture
 
-The project is built with a focus on modularity, error resilience, and terminal performance.
+The project is built as a **Codebase Co-processor**—a tool that lives in the terminal to provide actionable intelligence in a single turn.
 
 ### Core Components
-- **`bin/cli.js`**: The executable entry point. Manages global error boundaries, cursor state, and graceful signal handling (Ctrl+C).
-- **`src/main.js`**: Orchestrator. Handles initial argument parsing and executes the silent validation suite.
-- **`src/engine/`**: The "brain" of the application.
-    - **`models/`**: State-aware handlers for different AI provider requirements.
-        - `BaseModel.js`: Core logic for history management, exponential backoff, and robust tool execution loops.
-        - `default.js`: Optimized for standard OpenAI-compatible endpoints.
+- **`bin/cli.js`**: The executable entry point. Manages global error boundaries and graceful signal handling.
+- **`src/main.js`**: Orchestrator. Handles argument parsing and configuration loading.
+- **`src/engine/`**: The analytical core.
+    - **`models/`**: State-aware handlers.
+        - `BaseModel.js`: Core logic for tool-execution loops and exponential backoff.
         - `gemini.js`: Specialized handler for Google Gemini models, preserving the mandatory `thought_signature`.
-    - **`client.js`**: Manages OpenAI client instantiation and URL normalization.
-- **`src/utils/`**: Shared utilities for a consistent DX.
-    - `configManager.js`: Handles global `~/.env` loading and connectivity verification.
-    - `ui.js`: Minimalist, non-intrusive terminal animations (spinners).
-    - `logger.js`: Centralized truecolor ANSI logging with semantic levels.
+    - **`tools/`**: The analyst's "senses"—`searchText`, `findFile`, `projectTree`, and more.
+- **`src/utils/`**:
+    - `outputFormatter.js`: Dynamic terminal wrapping that preserves structure without Markdown.
+    - `logger.js`: Zero-whitespace, action-oriented logging (`[reading]`, `[searching]`).
 
 ## ✨ Key Features
 
-- **Enforced Context Safety**:
-    - **Visual Structure**: The `projectTree` tool generates a minimalist directory tree while respecting `.gitignore` patterns.
-    - **Smart Discovery**: `searchText`, `findFile`, and `findDir` support regex-based searching with recursion and ignore rules.
-    - **Safe File I/O**: `readFile` (1MB limit) and `readFileChunk` (range-based) include binary detection and async safety.
-    - **Self-Documenting**: The `listTools` utility provides the AI with real-time documentation on all available tools and usage guidelines.
-    - **Secure Web Fetching**: `webFetch` includes SSRF protection (blocking private IPs), HTML stripping, and strict timeouts.
-- **Polished CLI Experience**:
-    - **Terminal-Optimized**: A dynamic system prompt enforces plain-text structure, skipping Markdown to ensure clean rendering in all terminal environments.
-    - **Adaptive Formatting**: Implements dynamic word-wrapping in `outputFormatter.js` that automatically adjusts to the user's current terminal width, preserving indentation and handling long strings (like URLs) without layout breakage.
-    - **Context Injection**: Automatically injects `${folder}` (CWD) and `${year}` into the AI's system context for grounded responses.
-    - **Tight UI**: Zero-whitespace design with semantic, action-oriented tool logging (`[reading]`, `[searching]`, etc.) for a high-density, professional terminal feel.
-- **Robustness by Default**:
-    - **Silent Validation**: Every query is preceded by an automatic, silent configuration and connectivity check.
-    - **Advanced Retries**: Implements exponential backoff with jitter and respects `Retry-After` headers for rate-limited APIs.
-    - **Self-Correcting Loop**: Execution errors from tool calls are fed back to the AI for autonomous recovery.
+- **Analyst Persona**: Enforced via a strict system prompt that prioritizes technical investigation and bans conversational filler.
+- **Universal Compatibility**: Works with **any** OpenAI-compatible endpoint (OpenRouter, Ollama, etc.).
+- **Tight UI Philosophy**:
+    - **Zero-Whitespace**: Maximal information density.
+    - **No Markdown**: Pure plain-text output optimized for raw terminal environments.
+    - **Semantic Action Logs**: Real-time feedback using action-oriented verbs.
+- **Discovery Power**:
+    - **Smart Trees**: `projectTree` respects `.gitignore` for noise-free mapping.
+    - **Surgical Search**: Regex-based `searchText` and `findFile` for pinpoint accuracy.
+- **Context Injection**: Automatically injects current workspace path and time into the model context.
 
 ## ⚙️ Configuration
 
-The tool uses a global configuration system. You must manually manage your settings in a `~/.env` file.
+Managed via a global `~/.env` file.
 
 ```env
-# Required Configuration
-BTW_MODEL_NAME=your-model-id          # e.g., gpt-4o or gemini-1.5-pro
-BTW_MODEL_URL=your-api-base-url       # e.g., https://api.openai.com/v1
+BTW_MODEL_NAME=google/gemini-3.1-pro  # e.g., via OpenRouter
+BTW_MODEL_URL=https://openrouter.ai/api/v1
 BTW_MODEL_API_KEY=your-secret-key
-BTW_MODEL_TYPE=openai                 # Options: 'openai' or 'gemini'
+BTW_MODEL_TYPE=openai                 # 'openai' or 'gemini'
 ```
 
 ## ⌨️ Usage
 
-The CLI enforces a single-argument query structure for precision. All multi-word queries must be wrapped in double quotes.
+Designed for one-shot technical queries.
 
 ```bash
-# General Query
-btw "Explain the architecture of a Node.js stream."
+# Investigative Query
+btw "How is error handling implemented in the engine?"
 
-# Tool-Assisted Query
-btw "Search for 'FIXME' in src/ and summarize the technical debt."
+# Pattern Discovery
+btw "Find all occurrences of 'FIXME' and analyze the technical debt."
 
-# Display Help
-btw --help
+# System Commands
+btw -v        # Show version
+btw --help    # Show help
 ```
 
 ## 🛠️ Development Conventions
 
-- **ES Modules**: The entire codebase uses native ESM.
-- **Surgical Logic**: Logic is isolated into small, testable functions. Avoid threading state across unrelated layers.
-- **No Dependencies**: Maintain a minimalist dependency tree (currently only `openai`, `dotenv`, and `ipaddr.js`).
-- **Validation First**: Ensure all new features are preceded by appropriate validation logic in `configManager.js`.
+- **Minimalism**: Maintain zero dependencies beyond core AI clients and basic utilities.
+- **Density**: Every tool output and log must be as compact as possible.
+- **Analyst-First**: Features must enhance the tool's ability to investigate code autonomously.
 
 ---
 
-*“btw... what was that command again?”*
+*“btw... stop waiting, start knowing.”*

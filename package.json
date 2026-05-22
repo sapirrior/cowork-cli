@@ -1,10 +1,16 @@
 {
   "name": "lets-ask-btw",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "the btw tool",
   "bin": {
     "btw": "bin/cli.js"
   },
+  "files": [
+    "bin/",
+    "src/",
+    "README.md",
+    "package.json"
+  ],
 
   "keywords": [
     "cli",

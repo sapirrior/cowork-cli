@@ -4,6 +4,7 @@ const helpMsg = `${formatMain('btw - Ask AI from your terminal')}
 
 ${formatSecondary('Usage:')}
   ${formatNormal('btw "<query>"         Ask a question to your configured AI model.')}
+  ${formatNormal('btw -v, --version     Show version information.')}
   ${formatNormal('btw -h, --help        Show this help message.')}
 
 ${formatSecondary('Examples:')}
