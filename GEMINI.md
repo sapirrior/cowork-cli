@@ -24,7 +24,7 @@ The project is built with a focus on modularity, error resilience, and terminal 
 
 - **Enforced Context Safety**:
     - **Visual Structure**: The `projectTree` tool generates a minimalist directory tree while respecting `.gitignore` patterns.
-    - **Smart Search**: `searchText` supports regex across files/folders with recursion, respects `.gitignore`, and skips binary files.
+    - **Smart Discovery**: `searchText`, `findFile`, and `findDir` support regex-based searching with recursion and ignore rules.
     - **Safe File I/O**: `readFile` (1MB limit) and `readFileChunk` (range-based) include binary detection and async safety.
     - **Self-Documenting**: The `listTools` utility provides the AI with real-time documentation on all available tools and usage guidelines.
     - **Secure Web Fetching**: `webFetch` includes SSRF protection (blocking private IPs), HTML stripping, and strict timeouts.
@@ -32,8 +32,7 @@ The project is built with a focus on modularity, error resilience, and terminal 
     - **Terminal-Optimized**: A dynamic system prompt enforces plain-text structure, skipping Markdown to ensure clean rendering in all terminal environments.
     - **Adaptive Formatting**: Implements dynamic word-wrapping in `outputFormatter.js` that automatically adjusts to the user's current terminal width, preserving indentation and handling long strings (like URLs) without layout breakage.
     - **Context Injection**: Automatically injects `${folder}` (CWD) and `${year}` into the AI's system context for grounded responses.
-    - **Tight UI**: Zero-whitespace design for a high-density, professional terminal feel.
-    - **Transparent Tooling**: Bracketed, unindented tool logs provide clear visibility into AI actions without clutter.
+    - **Tight UI**: Zero-whitespace design with semantic, action-oriented tool logging (`[reading]`, `[searching]`, etc.) for a high-density, professional terminal feel.
 - **Robustness by Default**:
     - **Silent Validation**: Every query is preceded by an automatic, silent configuration and connectivity check.
     - **Advanced Retries**: Implements exponential backoff with jitter and respects `Retry-After` headers for rate-limited APIs.
