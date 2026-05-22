@@ -1,14 +1,11 @@
 {
   "name": "lets-ask-btw",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "the btw tool",
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
-  },
   "bin": {
     "btw": "bin/cli.js"
   },
+
   "keywords": [
     "cli",
     "ai"
