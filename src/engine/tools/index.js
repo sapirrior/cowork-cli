@@ -4,6 +4,7 @@ import projectTree from './projectTree.js';
 import readFileChunk from './readFileChunk.js';
 import searchText from './searchText.js';
 import webFetch from './webFetch.js';
+import listTools from './listTools.js';
 
 export const toolDefinitions = [
   {
@@ -93,6 +94,18 @@ export const toolDefinitions = [
         required: ["url"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "listTools",
+      description: "List all available tools and usage guidelines.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: []
+      }
+    }
   }
 ];
 
@@ -102,7 +115,8 @@ const toolImplementations = {
   projectTree,
   readFileChunk,
   searchText,
-  webFetch
+  webFetch,
+  listTools
 };
 
 /**

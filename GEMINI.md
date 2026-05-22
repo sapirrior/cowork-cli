@@ -26,6 +26,7 @@ The project is built with a focus on modularity, error resilience, and terminal 
     - **Visual Structure**: The `projectTree` tool generates a minimalist directory tree while respecting `.gitignore` patterns.
     - **Smart Search**: `searchText` supports regex across files/folders with recursion, respects `.gitignore`, and skips binary files.
     - **Safe File I/O**: `readFile` (1MB limit) and `readFileChunk` (range-based) include binary detection and async safety.
+    - **Self-Documenting**: The `listTools` utility provides the AI with real-time documentation on all available tools and usage guidelines.
     - **Secure Web Fetching**: `webFetch` includes SSRF protection (blocking private IPs), HTML stripping, and strict timeouts.
 - **Polished CLI Experience**:
     - **Terminal-Optimized**: A dynamic system prompt enforces plain-text structure, skipping Markdown to ensure clean rendering in all terminal environments.

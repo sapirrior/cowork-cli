@@ -12,6 +12,7 @@ A lightweight, powerful CLI companion and mini quick analyst designed for specif
   - `searchText`: Search through your codebase using regex with recursion and ignore rules.
   - `projectTree`: Generate visual directory structures.
   - `readDir`: List directory contents efficiently.
+  - `listTools`: Provide detailed documentation on all available tools and their usage.
 - **Clean Output**: Automatic word-wrapping and suppressed intermediate "thoughts" for a polished CLI experience.
 - **Robust Configuration**: Simple setup via `~/.env` with support for custom model URLs and types.
 
