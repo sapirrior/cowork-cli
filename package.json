@@ -3,7 +3,7 @@
   "version": "0.2.3",
   "description": "the btw tool",
   "bin": {
-    "btw": "./bin/cli.js"
+    "btw": "bin/cli.js"
   },
   "keywords": [
     "cli",
