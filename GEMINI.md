@@ -29,6 +29,7 @@ The project is built with a focus on modularity, error resilience, and terminal 
     - **Secure Web Fetching**: `webFetch` includes SSRF protection (blocking private IPs), HTML stripping, and strict timeouts.
 - **Polished CLI Experience**:
     - **Terminal-Optimized**: A dynamic system prompt enforces plain-text structure, skipping Markdown to ensure clean rendering in all terminal environments.
+    - **Adaptive Formatting**: Implements dynamic word-wrapping in `outputFormatter.js` that automatically adjusts to the user's current terminal width, preserving indentation and handling long strings (like URLs) without layout breakage.
     - **Context Injection**: Automatically injects `${folder}` (CWD) and `${year}` into the AI's system context for grounded responses.
     - **Tight UI**: Zero-whitespace design for a high-density, professional terminal feel.
     - **Transparent Tooling**: Bracketed, unindented tool logs provide clear visibility into AI actions without clutter.
