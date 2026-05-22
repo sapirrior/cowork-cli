@@ -7,6 +7,7 @@ import webFetch from './webFetch.js';
 import listTools from './listTools.js';
 import findFile from './findFile.js';
 import findDir from './findDir.js';
+import askUser from './askUser.js';
 
 export const toolDefinitions = [
   {
@@ -142,6 +143,20 @@ export const toolDefinitions = [
         required: ["pattern"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "askUser",
+      description: "Ask the user a question via the terminal and get a text response.",
+      parameters: {
+        type: "object",
+        properties: {
+          question: { type: "string", description: "The question to ask the user." }
+        },
+        required: ["question"]
+      }
+    }
   }
 ];
 
@@ -154,7 +169,8 @@ const toolImplementations = {
   webFetch,
   listTools,
   findFile,
-  findDir
+  findDir,
+  askUser
 };
 
 /**

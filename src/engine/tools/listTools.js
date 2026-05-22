@@ -57,6 +57,12 @@ export default async function listTools() {
       usage: "listTools({})",
       description: "Lists all tools available to the AI with detailed descriptions and usage examples.",
       whenToUse: "Use this if you are unsure which tool is best suited for the current task."
+    },
+    {
+      name: "askUser",
+      usage: "askUser({ question: 'What is the API endpoint for this service?' })",
+      description: "Asks the user a specific question via the terminal and waits for a text response.",
+      whenToUse: "When you need specific information, clarification, or feedback from the user that cannot be found in the codebase."
     }
   ];
 

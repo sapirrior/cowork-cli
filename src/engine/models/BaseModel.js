@@ -195,12 +195,19 @@ export default class BaseModel {
         else displayArg = args.url || args.filePath || args.dirPath || args.path || args.pattern || JSON.stringify(args);
 
         const displayStr = displayArg.length > 60 ? displayArg.slice(0, 57) + "..." : displayArg;
-        logger.secondary(`[${label}] ${displayStr}`);
+
+        // NOTE: 'askUser' is interactive and handles its own semantic logging ([asking]) 
+        // to maintain terminal focus and avoid conflicts with the global spinner.
+        if (name !== 'askUser') {
+          logger.secondary(`[${label}] ${displayStr}`);
+          spinner.start(`[${label}] working`);
+        }
         
-        // 2. Safe Dispatch & Execution with Spinner
-        spinner.start(`[${label}] working`);
         const result = await dispatchTool(name, args);
-        spinner.stop();
+        
+        if (name !== 'askUser') {
+          spinner.stop();
+        }
 
         this.addMessage('tool', result, { tool_call_id: toolCall.id });
 

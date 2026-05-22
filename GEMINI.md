@@ -13,7 +13,7 @@ The project is built as a **Codebase Co-processor**—a tool that lives in the t
     - **`models/`**: State-aware handlers.
         - `BaseModel.js`: Core logic for tool-execution loops and exponential backoff.
         - `gemini.js`: Specialized handler for Google Gemini models, preserving the mandatory `thought_signature`.
-    - **`tools/`**: The analyst's "senses"—`searchText`, `findFile`, `projectTree`, and more.
+    - **`tools/`**: The analyst's "senses"—`searchText`, `findFile`, `projectTree`, and the interactive `askUser`.
 - **`src/utils/`**:
     - `outputFormatter.js`: Dynamic terminal wrapping that preserves structure without Markdown.
     - `logger.js`: Zero-whitespace, action-oriented logging (`[reading]`, `[searching]`).
@@ -29,6 +29,8 @@ The project is built as a **Codebase Co-processor**—a tool that lives in the t
 - **Discovery Power**:
     - **Smart Trees**: `projectTree` respects `.gitignore` for noise-free mapping.
     - **Surgical Search**: Regex-based `searchText` and `findFile` for pinpoint accuracy.
+- **Interactive Intelligence**:
+    - **`askUser`**: Allows the AI to pause execution and request specific feedback or clarification via a high-density terminal prompt.
 - **Context Injection**: Automatically injects current workspace path and time into the model context.
 
 ## ⚙️ Configuration
