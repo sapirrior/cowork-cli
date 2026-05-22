@@ -5,6 +5,8 @@ import readFileChunk from './readFileChunk.js';
 import searchText from './searchText.js';
 import webFetch from './webFetch.js';
 import listTools from './listTools.js';
+import findFile from './findFile.js';
+import findDir from './findDir.js';
 
 export const toolDefinitions = [
   {
@@ -106,6 +108,40 @@ export const toolDefinitions = [
         required: []
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "findFile",
+      description: "Find files by name using regex. Supports recursion and .gitignore.",
+      parameters: {
+        type: "object",
+        properties: {
+          pattern: { type: "string", description: "Regex pattern to match filenames." },
+          dirPath: { type: "string", description: "Root directory to search (default: '.')." },
+          recursive: { type: "boolean", description: "Search subdirectories? (default: true)" },
+          limit: { type: "number", description: "Maximum number of results (default: 15, max: 15)." }
+        },
+        required: ["pattern"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "findDir",
+      description: "Find directories by name using regex. Supports recursion and .gitignore.",
+      parameters: {
+        type: "object",
+        properties: {
+          pattern: { type: "string", description: "Regex pattern to match directory names." },
+          dirPath: { type: "string", description: "Root directory to search (default: '.')." },
+          recursive: { type: "boolean", description: "Search subdirectories? (default: true)" },
+          limit: { type: "number", description: "Maximum number of results (default: 15, max: 15)." }
+        },
+        required: ["pattern"]
+      }
+    }
   }
 ];
 
@@ -116,7 +152,9 @@ const toolImplementations = {
   readFileChunk,
   searchText,
   webFetch,
-  listTools
+  listTools,
+  findFile,
+  findDir
 };
 
 /**

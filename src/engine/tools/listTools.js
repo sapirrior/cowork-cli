@@ -41,6 +41,18 @@ export default async function listTools() {
       whenToUse: "To gather information from online documentation, API references, or external technical articles."
     },
     {
+      name: "findFile",
+      usage: "findFile({ pattern: 'config.*\\\\.js$', dirPath: 'src/', limit: 10 })",
+      description: "Finds files by name using regex. Supports recursion and respects .gitignore. Max 15 results.",
+      whenToUse: "When you know the name or part of the name of a file but don't know its exact location."
+    },
+    {
+      name: "findDir",
+      usage: "findDir({ pattern: 'models', recursive: true })",
+      description: "Finds directories by name using regex. Supports recursion and respects .gitignore. Max 15 results.",
+      whenToUse: "To locate specific modules or folder structures within the project."
+    },
+    {
       name: "listTools",
       usage: "listTools({})",
       description: "Lists all tools available to the AI with detailed descriptions and usage examples.",
