@@ -77,7 +77,7 @@ export default async function projectTree({ dirPath }) {
     finalOutput = finalOutput.trimEnd();
 
     if (isTruncated) {
-      finalOutput += `\n\n[Warning: Tree truncated at ${MAX_ITEMS} items]`;
+      finalOutput += `\n[Warning: Truncated at ${MAX_ITEMS} items]`;
     }
 
     return finalOutput;

@@ -60,15 +60,14 @@ export default async function listTools() {
     }
   ];
 
-  let output = "AVAILABLE TOOLS AND USAGE GUIDELINES:\n\n";
+  let output = "AVAILABLE TOOLS:\n";
 
   tools.forEach(tool => {
-    output += `Tool: ${tool.name}\n`;
-    output += `Description: ${tool.description}\n`;
-    output += `When to use: ${tool.whenToUse}\n`;
-    output += `Example Usage: ${tool.usage}\n`;
-    output += "--------------------------------------------------\n";
+    output += `[${tool.name}]\n`;
+    output += `Desc:${tool.description}\n`;
+    output += `Use:${tool.whenToUse}\n`;
+    output += `Ex:${tool.usage}\n`;
   });
 
-  return output;
+  return output.trim();
 }

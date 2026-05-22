@@ -59,12 +59,12 @@ export default async function findFile({ pattern, dirPath = '.', recursive = tru
     await walk(dirPath);
 
     if (results.length === 0) {
-      return `No files found matching pattern "${pattern}" in "${dirPath}".`;
+      return `No files found matching "${pattern}" in "${dirPath}".`;
     }
 
-    let output = `FOUND FILES (${results.length}):\n${results.join('\n')}`;
+    let output = results.join('\n');
     if (results.length >= finalLimit) {
-      output += `\n[Warning: Results limited to ${finalLimit}. Try a more specific pattern.]`;
+      output += `\n[Warning: Truncated at ${finalLimit} matches]`;
     }
     return output;
 

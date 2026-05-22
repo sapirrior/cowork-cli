@@ -15,8 +15,8 @@ export default async function readDir({ dirPath }) {
     const formattedItems = items
       .filter(item => !shouldIgnore(item.name, ignoreList))
       .map(item => {
-        const type = item.isDirectory() ? '[DIR] ' : '[FILE]';
-        return `${type} ${item.name}`;
+        const type = item.isDirectory() ? '[D]' : '[F]';
+        return `${type}${item.name}`;
       });
 
     if (formattedItems.length === 0) {

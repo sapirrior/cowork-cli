@@ -90,14 +90,15 @@ export default async function searchText({ pattern, path: searchPath, recursive 
     if (results.length === 0) return "No matches found.";
 
     let output = results.map(res => {
-      return `--- ${res.file} ---\n${res.matches.join('\n')}`;
-    }).join('\n\n');
+      return `[${res.file}]\n${res.matches.join('\n')}`;
+    }).join('\n');
 
     if (isTruncated) {
-      output += `\n\n[Warning: Results truncated due to safety limits (Max ${MAX_TOTAL_MATCHES} matches)]`;
+      output += `\n[Warning: Truncated at ${MAX_TOTAL_MATCHES} matches]`;
     }
 
     return output;
+
 
   } catch (err) {
     if (err.code === 'ENOENT') return `Error: Path not found at '${searchPath}'.`;
@@ -121,7 +122,7 @@ async function searchInFile(filePath, regex) {
     
     for (let i = 0; i < lines.length; i++) {
       if (regex.test(lines[i])) {
-        matches.push(`${i + 1}: ${lines[i].trim()}`);
+        matches.push(`${i + 1}:${lines[i].trim()}`);
         if (matches.length >= MAX_MATCHES_PER_FILE) break;
       }
     }

@@ -176,6 +176,7 @@ export default class BaseModel {
         // Clean tool logging: Extract primary arguments for better readability
         let displayArg = "";
         if (name === 'searchText') displayArg = `'${args.pattern}' in ${args.path}`;
+        else if (name === 'findFile' || name === 'findDir') displayArg = `'${args.pattern}' in ${args.dirPath || '.'}`;
         else if (name === 'readFileChunk') displayArg = `${args.filePath} [${args.startLine}-${args.endLine}]`;
         else if (args.url) displayArg = args.url;
         else if (args.filePath) displayArg = args.filePath;
