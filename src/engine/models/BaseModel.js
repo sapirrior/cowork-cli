@@ -173,23 +173,32 @@ export default class BaseModel {
           throw new Error(`Invalid JSON arguments provided for tool '${name}': ${parseErr.message}`);
         }
 
-        // Clean tool logging: Extract primary arguments for better readability
+        // Semantic Tool Logging
+        const toolLabels = {
+          readFile: 'reading',
+          readDir: 'listing',
+          projectTree: 'mapping',
+          readFileChunk: 'peeking',
+          searchText: 'searching',
+          webFetch: 'fetching',
+          findFile: 'finding',
+          findDir: 'finding',
+          listTools: 'listing'
+        };
+
+        const label = toolLabels[name] || name;
         let displayArg = "";
+
         if (name === 'searchText') displayArg = `'${args.pattern}' in ${args.path}`;
         else if (name === 'findFile' || name === 'findDir') displayArg = `'${args.pattern}' in ${args.dirPath || '.'}`;
-        else if (name === 'readFileChunk') displayArg = `${args.filePath} [${args.startLine}-${args.endLine}]`;
-        else if (args.url) displayArg = args.url;
-        else if (args.filePath) displayArg = args.filePath;
-        else if (args.dirPath) displayArg = args.dirPath;
-        else if (args.path) displayArg = args.path;
-        else if (args.pattern) displayArg = args.pattern;
-        else displayArg = JSON.stringify(args);
+        else if (name === 'readFileChunk') displayArg = `${args.filePath} [L${args.startLine}-${args.endLine}]`;
+        else displayArg = args.url || args.filePath || args.dirPath || args.path || args.pattern || JSON.stringify(args);
 
         const displayStr = displayArg.length > 60 ? displayArg.slice(0, 57) + "..." : displayArg;
-        logger.secondary(`[${name}] ${displayStr}`);
+        logger.secondary(`[${label}] ${displayStr}`);
         
         // 2. Safe Dispatch & Execution with Spinner
-        spinner.start(`[${name}] Executing`);
+        spinner.start(`[${label}] working`);
         const result = await dispatchTool(name, args);
         spinner.stop();
 
