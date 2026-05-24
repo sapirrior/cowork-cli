@@ -11,7 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PKG_PATH = path.join(__dirname, '../package.json');
 
 /**
- * Main entry point for the btw CLI.
+ * Main entry point for the cwk CLI.
  * @param {string[]} args Command line arguments.
  */
 export default async function main(args) {
@@ -25,7 +25,7 @@ export default async function main(args) {
   if (args[0] === '-v' || args[0] === '--version') {
     try {
       const pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
-      console.log(`btw version ${pkg.version}`);
+      console.log(`cwk version ${pkg.version}`);
     } catch (e) {
       logger.error("Error reading version from package.json");
     }

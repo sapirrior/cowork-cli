@@ -87,7 +87,7 @@ export default async function webFetch({ url }) {
         signal: controller.signal,
         redirect: 'manual', // We handle redirects manually for safety
         headers: {
-          'User-Agent': 'lets-ask-btw/0.1 (Analyst Tool; SSRF-Protected)',
+          'User-Agent': 'cowork-cli/0.1 (Analyst Tool; SSRF-Protected)',
           'Accept': 'text/html,application/xhtml+xml,application/json,text/plain'
         }
       });

@@ -2,7 +2,7 @@
 
 /**
  * @file cli.js
- * @description Executable entry point for the btw CLI tool.
+ * @description Executable entry point for the cwk CLI tool.
  * Handles top-level error boundaries and passes execution to the main application logic.
  */
 

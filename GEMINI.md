@@ -1,71 +1,70 @@
-# lets-ask-btw (btw) 🚀
+# Project Instructions: cowork-cli (cwk)
 
-`lets-ask-btw` (`btw`) is a hardened, minimalist Node.js Developer Analyst tool. It is designed for high-density, context-aware codebase investigation using any OpenAI-compatible API, with first-class support for Gemini 3.1+ models.
+`cowork-cli` (`cwk`) is a high-speed, minimalist AI CLI analyst designed for developers. It functions as a context-aware co-processor that investigates codebases using a tool-calling loop to provide precise technical answers.
 
-## 🏗️ Architecture
+## Project Overview
 
-The project is built as a **Codebase Co-processor**—a tool that lives in the terminal to provide actionable intelligence in a single turn.
+- **Core Goal:** Provide rapid, non-conversational technical analysis of a codebase.
+- **Technologies:** Node.js (ES Modules), OpenAI SDK, `dotenv`.
+- **Key Features:**
+  - Compatibility with any OpenAI-compatible API.
+  - Specialized handler for Google Gemini models to preserve high-density analytical features (e.g., thought signatures).
+  - Robust tool-calling suite for filesystem interaction and interactive user feedback.
+  - High-density, minimalist terminal UI.
 
-### Core Components
-- **`bin/cli.js`**: The executable entry point. Manages global error boundaries and graceful signal handling.
-- **`src/main.js`**: Orchestrator. Handles argument parsing and configuration loading.
-- **`src/engine/`**: The analytical core.
-    - **`models/`**: State-aware handlers.
-        - `BaseModel.js`: Core logic for tool-execution loops and exponential backoff.
-        - `gemini.js`: Specialized handler for Google Gemini models, preserving the mandatory `thought_signature`.
-    - **`tools/`**: The analyst's "senses"—`searchText`, `findFile`, `projectTree`, and the interactive `askUser`.
-- **`src/utils/`**:
-    - `outputFormatter.js`: Dynamic terminal wrapping that preserves structure without Markdown.
-    - `logger.js`: Zero-whitespace, action-oriented logging (`[reading]`, `[searching]`).
+## Architecture
 
-## ✨ Key Features
+The project is organized into several key modules:
 
-- **Analyst Persona**: Enforced via a strict system prompt that prioritizes technical investigation and bans conversational filler.
-- **Universal Compatibility**: Works with **any** OpenAI-compatible endpoint (OpenRouter, Ollama, etc.).
-- **Tight UI Philosophy**:
-    - **Zero-Whitespace**: Maximal information density.
-    - **No Markdown**: Pure plain-text output optimized for raw terminal environments.
-    - **Semantic Action Logs**: Real-time feedback using action-oriented verbs.
-- **Discovery Power**:
-    - **Smart Trees**: `projectTree` respects `.gitignore` for noise-free mapping.
-    - **Surgical Search**: Regex-based `searchText` and `findFile` for pinpoint accuracy.
-- **Interactive Intelligence**:
-    - **`askUser`**: Allows the AI to pause execution and request specific feedback or clarification via a high-density terminal prompt.
-- **Context Injection**: Automatically injects current workspace path and time into the model context.
+- `bin/cli.js`: The executable entry point. Handles global error boundaries and signal interrupts.
+- `src/main.js`: Orchestrates the CLI flow: argument parsing, configuration loading, connectivity checks, and execution.
+- `src/engine/run.js`: Prepares the system prompt and selects the appropriate model handler.
+- `src/engine/models/`: Contains model interaction logic.
+  - `BaseModel.js`: Encapsulates the core execution loop, message history, retry logic (exponential backoff), and tool dispatching.
+  - `default.js`: Standard OpenAI-compatible implementation.
+  - `gemini.js`: Specialized handler for Gemini models.
+- `src/engine/tools/`: A collection of functional tools (e.g., `readFile`, `searchText`, `projectTree`) that the AI uses to explore the workspace.
+- `src/utils/`: Shared utilities for configuration management, filesystem operations, logging, and UI formatting.
 
-## ⚙️ Configuration
+## Building and Running
 
-Managed via a global `~/.env` file.
+### Prerequisites
+- Node.js (v14+ recommended).
+- An API key for an OpenAI-compatible provider (e.g., OpenAI, OpenRouter, Ollama).
 
-```env
-BTW_MODEL_NAME=google/gemini-3.1-pro  # e.g., via OpenRouter
-BTW_MODEL_URL=https://openrouter.ai/api/v1
-BTW_MODEL_API_KEY=your-secret-key
-BTW_MODEL_TYPE=openai                 # 'openai' or 'gemini'
-```
+### Setup
+1. Clone the repository.
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Configure your environment in `~/.env`:
+   ```env
+   BTW_MODEL_NAME=your_model_name
+   BTW_MODEL_URL=your_api_url
+   BTW_MODEL_API_KEY=your_api_key
+   BTW_MODEL_TYPE=openai # or 'gemini'
+   ```
 
-## ⌨️ Usage
+### Execution
+- **Run directly:**
+  ```bash
+  node bin/cli.js "your query here"
+  ```
+- **Development Link:**
+  ```bash
+  npm link
+  btw "your query here"
+  ```
 
-Designed for one-shot technical queries.
+### Testing
+- **TODO:** Implement unit and integration tests. The `package.json` contains a placeholder for `npm test`.
 
-```bash
-# Investigative Query
-btw "How is error handling implemented in the engine?"
+## Development Conventions
 
-# Pattern Discovery
-btw "Find all occurrences of 'FIXME' and analyze the technical debt."
-
-# System Commands
-btw -v        # Show version
-btw --help    # Show help
-```
-
-## 🛠️ Development Conventions
-
-- **Minimalism**: Maintain zero dependencies beyond core AI clients and basic utilities.
-- **Density**: Every tool output and log must be as compact as possible.
-- **Analyst-First**: Features must enhance the tool's ability to investigate code autonomously.
-
----
-
-*“btw... stop waiting, start knowing.”*
+- **Module System:** Uses ES Modules exclusively.
+- **Code Style:** Prefers a functional approach for tools and object-oriented structure for model handlers.
+- **Documentation:** Use JSDoc for documenting functions and classes.
+- **UI:** Adhere to the "Zero-Whitespace" philosophy. Keep output high-density and avoid unnecessary filler.
+- **Error Handling:** Centralize error boundaries in `cli.js` and `BaseModel.js`. Use `logger.error` for user-facing errors.
+- **Tool Development:** New tools should be added to `src/engine/tools/`, registered in `index.js`, and include clear descriptions and parameter definitions in `toolDefinitions`.
