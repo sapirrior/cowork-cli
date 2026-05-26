@@ -5,7 +5,7 @@ import { formatSecondary } from './logger.js';
  */
 export class Spinner {
   constructor() {
-    this.frames = ['', '.', '..', '...'];
+    this.frames = ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷'];
     this.interval = null;
     this.currentFrame = 0;
     this.text = '';
@@ -24,7 +24,7 @@ export class Spinner {
     this.interval = setInterval(() => {
       this.currentFrame = (this.currentFrame + 1) % this.frames.length;
       this.render();
-    }, 400); // Slower interval for dot cycle
+    }, 100); // Smooth braille rotation rate
   }
 
   /**
@@ -59,9 +59,9 @@ export class Spinner {
    * @private
    */
   render() {
-    const dots = this.frames[this.currentFrame];
-    // Renders the text followed by the cycling dots
-    process.stdout.write(`\r\x1b[K${formatSecondary(`${this.text}${dots}`)}`);
+    const frame = this.frames[this.currentFrame];
+    // Renders the cycling spinner frame followed by the text
+    process.stdout.write(`\r\x1b[K${formatSecondary(`${frame} ${this.text}`)}`);
   }
 }
 

@@ -21,17 +21,17 @@ export default async function runQuery(client, config, query) {
   }
 
   try {
-    // 1. Load and format system prompt from internal config
+    // 1. Load and format system prompt from internal sys.txt
     let systemPrompt = null;
     try {
-      const internalConfig = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-      if (internalConfig.systemPrompt) {
-        systemPrompt = internalConfig.systemPrompt
+      const promptPath = path.join(__dirname, '../configs/sys.txt');
+      if (fs.existsSync(promptPath)) {
+        systemPrompt = fs.readFileSync(promptPath, 'utf8')
           .replace('${folder}', process.cwd())
-          .replace('${year}', new Date().getFullYear());
+          .replace(/\${year}/g, new Date().getFullYear());
       }
     } catch (e) {
-      // Fallback if config is missing - proceed without system prompt
+      // Fallback if prompt is missing - proceed without system prompt
     }
 
     const isGemini = config.model_type.toLowerCase() === 'gemini';

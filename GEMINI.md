@@ -39,7 +39,7 @@ graph TD
   * Loads and validates user configurations.
   * Verifies connectivity before executing any queries.
 * [src/engine/run.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/run.js)
-  * Reads the system prompt template from [config.json](file:///data/data/com.termux/files/home/works/cwk/src/configs/config.json).
+  * Reads the system prompt template from [sys.txt](file:///data/data/com.termux/files/home/works/cwk/src/configs/sys.txt).
   * Dynamically interpolates the current working directory (`${folder}`) and current year (`${year}`) into the system prompt.
   * Decides whether to instantiate a [GeminiModel](file:///data/data/com.termux/files/home/works/cwk/src/engine/models/gemini.js) or a [DefaultModel](file:///data/data/com.termux/files/home/works/cwk/src/engine/models/default.js) based on configuration.
 * [src/engine/client.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/client.js)
@@ -112,7 +112,7 @@ Located under [src/utils/](file:///data/data/com.termux/files/home/works/cwk/src
   * Wraps text dynamically based on the current terminal column width (defaults to 80).
   * Preserves leading indentation spaces and splits long strings/words cleanly to prevent layout breaking.
 * [ui.js](file:///data/data/com.termux/files/home/works/cwk/src/utils/ui.js)
-  * Minimalist spinner using text frame dot cycles (`.`, `..`, `...`).
+  * Minimalist spinner using Braille rotation frames (`⣾`, `⣽`, `⣻`, etc.).
   * Shows/hides the cursor (`\x1b[?25l` / `\x1b[?25h`) and uses terminal line clearing escape sequences (`\r\x1b[K`) to prevent line duplication.
 * [helpMsg.js](file:///data/data/com.termux/files/home/works/cwk/src/utils/helpMsg.js)
   * Minimalist usage screen explaining flags, examples, and environment variables.
@@ -122,7 +122,7 @@ Located under [src/utils/](file:///data/data/com.termux/files/home/works/cwk/src
 ## Key Configurations & Customization
 
 ### Application Configuration
-Default UI themes, colors, and system instructions are configured in:
+Default UI themes and colors are configured in:
 * [src/configs/config.json](file:///data/data/com.termux/files/home/works/cwk/src/configs/config.json)
 
 ```json
@@ -131,10 +131,13 @@ Default UI themes, colors, and system instructions are configured in:
     "orangex": "#D97757",
     "greyx": "#808080",
     "resetx": "#FFFFFF"
-  },
-  "systemPrompt": "You are a concise Developer Analyst. Use available tools proactively..."
+  }
 }
 ```
+
+### System Instructions
+The AI's core logic and mandates are defined in a dedicated plain-text file:
+* [src/configs/sys.txt](file:///data/data/com.termux/files/home/works/cwk/src/configs/sys.txt)
 
 ---
 
