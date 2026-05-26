@@ -17,10 +17,10 @@ export const loadConfig = () => {
       const envConfig = dotenv.parse(content);
       
       const config = {
-        model_name: envConfig.CWK_MODEL_NAME || envConfig.BTW_MODEL_NAME || envConfig.MODEL_NAME,
-        model_url: envConfig.CWK_MODEL_URL || envConfig.BTW_MODEL_URL || envConfig.MODEL_URL,
-        model_api_key: envConfig.CWK_MODEL_API_KEY || envConfig.BTW_MODEL_API_KEY || envConfig.MODEL_API_KEY,
-        model_type: envConfig.CWK_MODEL_TYPE || envConfig.BTW_MODEL_TYPE || envConfig.MODEL_TYPE
+        model_name: envConfig.CWK_MODEL_NAME || envConfig.MODEL_NAME,
+        model_url: envConfig.CWK_MODEL_URL || envConfig.MODEL_URL,
+        model_api_key: envConfig.CWK_MODEL_API_KEY || envConfig.MODEL_API_KEY,
+        model_type: envConfig.CWK_MODEL_TYPE || envConfig.MODEL_TYPE
       };
 
       // Remove undefined/empty values
