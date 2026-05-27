@@ -8,6 +8,7 @@ import listTools from './listTools.js';
 import findFile from './findFile.js';
 import findDir from './findDir.js';
 import askUser from './askUser.js';
+import askConfirm from './askConfirm.js';
 
 export const toolDefinitions = [
   {
@@ -148,11 +149,25 @@ export const toolDefinitions = [
     type: "function",
     function: {
       name: "askUser",
-      description: "Ask the user a question via the terminal and get a text response.",
+      description: "Ask the user an open-ended question via the terminal and get a free-text response.",
       parameters: {
         type: "object",
         properties: {
           question: { type: "string", description: "The question to ask the user." }
+        },
+        required: ["question"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "askConfirm",
+      description: "Ask the user a yes/no confirmation question. Use this instead of askUser when only a boolean decision is needed. Returns { confirmed: true } for yes, { confirmed: false } for no, and { confirmed: false, dismissed: true } if the user cancels with Ctrl+C.",
+      parameters: {
+        type: "object",
+        properties: {
+          question: { type: "string", description: "The yes/no question to ask the user." }
         },
         required: ["question"]
       }
@@ -170,7 +185,8 @@ const toolImplementations = {
   listTools,
   findFile,
   findDir,
-  askUser
+  askUser,
+  askConfirm
 };
 
 /**

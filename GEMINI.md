@@ -67,7 +67,12 @@ Located under [src/engine/tools/](file:///data/data/com.termux/files/home/works/
   * Registers tool implementations and provides the `dispatchTool` resolver.
 * [askUser.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/tools/askUser.js)
   * Prompting interface that asks the user a text question in the terminal.
-  * Validates interactive status (`stdin.isTTY`), moves/clears lines for empty answers, and supports signal cancels (`SIGINT`).
+  * Validates input and interactive status (`stdin.isTTY`), then delegates entirely to `ui.ask()` from the `UIEngine` singleton.
+  * Returns `{ answer }` on success or `{ error, dismissed: true }` on cancellation / error.
+* [askConfirm.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/tools/askConfirm.js)
+  * Prompting interface that asks the user a yes/no question using a sleek interactive toggle.
+  * Delegates entirely to `ui.confirm()` from the `UIEngine` singleton.
+  * Returns `{ confirmed: true|false }` or `{ confirmed: false, dismissed: true }` on cancellation.
 * [findDir.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/tools/findDir.js)
   * Searches directory names recursively matching a regex pattern. Results are capped at 15 matches.
 * [findFile.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/tools/findFile.js)
@@ -106,14 +111,35 @@ Located under [src/utils/](file:///data/data/com.termux/files/home/works/cwk/src
   * Reads `.gitignore` patterns in the current working directory.
   * Combines them with built-in default ignores (`.git`, `node_modules`, `dist`, `build`, `.npm`, `.DS_Store`) to determine whether paths should be skipped.
 * [logger.js](file:///data/data/com.termux/files/home/works/cwk/src/utils/logger.js)
-  * Converts hex colors from `config.json` into ANSI TrueColor escape sequences.
-  * Outputs styled main (orange), secondary (grey), normal (white), and error strings.
+  * Reads the color tokens (`main`, `tool`, `data`, `success`, `error`, `dim`, `header`) from `config.json` and converts them to ANSI TrueColor sequences.
+  * Exports `formatMain`, `formatSecondary`, `formatNormal`, `formatError`, `formatDim`, `formatHeader` formatting helpers.
+  * Exports `logger` object with `.main()`, `.secondary()`, `.normal()`, and `.error()` convenience methods.
 * [outputFormatter.js](file:///data/data/com.termux/files/home/works/cwk/src/utils/outputFormatter.js)
   * Wraps text dynamically based on the current terminal column width (defaults to 80).
   * Preserves leading indentation spaces and splits long strings/words cleanly to prevent layout breaking.
 * [ui.js](file:///data/data/com.termux/files/home/works/cwk/src/utils/ui.js)
-  * Minimalist spinner using Braille rotation frames (`⣾`, `⣽`, `⣻`, etc.).
-  * Shows/hides the cursor (`\x1b[?25l` / `\x1b[?25h`) and uses terminal line clearing escape sequences (`\r\x1b[K`) to prevent line duplication.
+  * `UIEngine` — State-Based Reactive Terminal Interface.
+  * **Four states:** `IDLE → SPINNING → IDLE`, `IDLE → THINKING → IDLE`, `IDLE → ASKING → IDLE`.
+  * **Virtual DOM:** `_vdom { frame, label, data }` tracks exactly what is on screen. Every tick diffs against it and patches only what changed.
+  * **Three patch operations** (no full-line clears during animation):
+    * `_patchFrame(frame)` — overwrites 1 char at col 0, `~22 bytes/tick`.
+    * `_patchFromLabel(label, data)` — repaints from col 2 onward (label change in THINKING mode, ~1/8 ticks).
+    * `_patchFromData(label, data)` — repaints from `(` col onward (on `update()` call only).
+  * **Design tokens:** `COLORS` (`main` blue, `tool` amber, `data` silver, `success` green, `error` red, `dim` grey, `header` purple), `THOUGHTS` word list, `GLYPHS` (`● ◇ > ⣾…`).
+  * **Glyph `●`** is color-coded: green (`COLORS.success`) on `stop()`, red (`COLORS.error`) on `fail()`.
+  * `ui.start(label, data?)` — enter SPINNING. Silently replaces any active spinner.
+  * `ui.think()` — enter THINKING (rotating thought words). Replaces any active spinner.
+  * `ui.update(data)` — swap data field in-place; no-ops if truncated value unchanged.
+  * `ui.stop(msg?)` — SPINNING/THINKING → IDLE, prints `● green label (msg)`.
+  * `ui.fail(msg?)` — SPINNING/THINKING → IDLE, prints `● red label (msg)`.
+  * `ui.log(text)` — safe from any state; lifts above spinner if active.
+  * `ui.ask(question)` — styled `◇ Question` prompt. TTY-safe, SIGINT-cancellable, re-prompts on empty. Resolves to trimmed string; rejects `{ cancelled: true }` on SIGINT.
+  * `ui.header(title)` — prints `◆ title` via `log()`.
+  * `ui.footer(duration)` — prints dim elapsed-time line via `log()`.
+  * `ui.cleanup()` — `_abort()` + show cursor; safe from any state.
+  * `ui.state` — read-only getter returning current state string.
+  * Exported singleton: `export const ui = new UIEngine()`.
+  * Auto full-repaint on terminal `resize` event (truncation bounds change).
 * [helpMsg.js](file:///data/data/com.termux/files/home/works/cwk/src/utils/helpMsg.js)
   * Minimalist usage screen explaining flags, examples, and environment variables.
 
@@ -128,9 +154,13 @@ Default UI themes and colors are configured in:
 ```json
 {
   "accents": {
-    "orangex": "#D97757",
-    "greyx": "#808080",
-    "resetx": "#FFFFFF"
+    "main":    "#7BA5DA",
+    "tool":    "#F2CF6E",
+    "data":    "#C2C6C5",
+    "success": "#7AC391",
+    "error":   "#E07070",
+    "dim":     "#606060",
+    "header":  "#A37ACC"
   }
 }
 ```

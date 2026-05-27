@@ -9,12 +9,15 @@ let config;
 try {
   config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 } catch (e) {
-  // Fallback config if file is missing or invalid
   config = {
     accents: {
-      orangex: "#D97757",
-      greyx: "#808080",
-      resetx: "#FFFFFF"
+      main:    '#7BA5DA',
+      tool:    '#F2CF6E',
+      data:    '#C2C6C5',
+      success: '#7AC391',
+      error:   '#E07070',
+      dim:     '#606060',
+      header:  '#A37ACC',
     }
   };
 }
@@ -26,20 +29,28 @@ function hexToAnsi(hex) {
   return `\x1b[38;2;${r};${g};${b}m`;
 }
 
+const reset = '\x1b[0m';
+
 const colors = {
-  main: hexToAnsi(config.accents.orangex),
-  secondary: hexToAnsi(config.accents.greyx),
-  normal: hexToAnsi(config.accents.resetx),
-  reset: '\x1b[0m'
+  main:    hexToAnsi(config.accents.main),
+  tool:    hexToAnsi(config.accents.tool),
+  data:    hexToAnsi(config.accents.data),
+  success: hexToAnsi(config.accents.success),
+  error:   hexToAnsi(config.accents.error),
+  dim:     hexToAnsi(config.accents.dim),
+  header:  hexToAnsi(config.accents.header),
 };
 
-export const formatMain = (text) => `${colors.main}${text}${colors.reset}`;
-export const formatSecondary = (text) => `${colors.secondary}${text}${colors.reset}`;
-export const formatNormal = (text) => `${colors.normal}${text}${colors.reset}`;
+export const formatMain      = (text) => `${colors.main}${text}${reset}`;
+export const formatSecondary = (text) => `${colors.tool}${text}${reset}`;
+export const formatNormal    = (text) => `${colors.data}${text}${reset}`;
+export const formatError     = (text) => `${colors.error}${text}${reset}`;
+export const formatDim       = (text) => `${colors.dim}${text}${reset}`;
+export const formatHeader    = (text) => `${colors.header}${text}${reset}`;
 
 export const logger = {
-  main: (msg) => console.log(formatMain(msg)),
+  main:      (msg) => console.log(formatMain(msg)),
   secondary: (msg) => console.log(formatSecondary(msg)),
-  normal: (msg) => console.log(formatNormal(msg)),
-  error: (msg) => console.error(formatMain(msg))
+  normal:    (msg) => console.log(formatNormal(msg)),
+  error:     (msg) => console.error(formatError(msg)),
 };

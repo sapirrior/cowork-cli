@@ -6,7 +6,6 @@ import DefaultModel from './models/default.js';
 import GeminiModel from './models/gemini.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CONFIG_PATH = path.join(__dirname, '../configs/config.json');
 
 /**
  * Executes a chat completion query using the appropriate model handler.
