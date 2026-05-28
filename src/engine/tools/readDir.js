@@ -1,5 +1,5 @@
 import fs from 'fs/promises';
-import { getIgnorePatterns, shouldIgnore } from '../../utils/fsUtils.js';
+import { getIgnorePatterns, isSafeEntry, safePath } from '../../utils/fsUtils.js';
 
 /**
  * Implementation of the readDir tool.
@@ -8,12 +8,19 @@ import { getIgnorePatterns, shouldIgnore } from '../../utils/fsUtils.js';
  * @returns {Promise<string>} List of files and folders or error message.
  */
 export default async function readDir({ dirPath }) {
+  let resolvedPath;
+  try {
+    resolvedPath = safePath(dirPath);
+  } catch (err) {
+    return `Error: ${err.message}`;
+  }
+
   try {
     const ignoreList = await getIgnorePatterns();
-    const items = await fs.readdir(dirPath, { withFileTypes: true });
-    
+    const items = await fs.readdir(resolvedPath, { withFileTypes: true });
+
     const formattedItems = items
-      .filter(item => !shouldIgnore(item.name, ignoreList))
+      .filter(item => isSafeEntry(item, resolvedPath, ignoreList))
       .map(item => {
         const type = item.isDirectory() ? '[D]' : '[F]';
         return `${type}${item.name}`;

@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { getIgnorePatterns, shouldIgnore } from '../../utils/fsUtils.js';
+import { getIgnorePatterns, isSafeEntry, loadNestedIgnores, safePath } from '../../utils/fsUtils.js';
 
 /**
  * findDir tool: Finds directories by name using regex.
@@ -13,10 +13,10 @@ import { getIgnorePatterns, shouldIgnore } from '../../utils/fsUtils.js';
 export default async function findDir({ pattern, dirPath = '.', recursive = true, limit = 15 }) {
   try {
     if (!pattern) return "Error: Search pattern cannot be empty.";
-    
+
     // Enforce max limit of 15
     const finalLimit = Math.min(limit, 15);
-    
+
     let regex;
     try {
       regex = new RegExp(pattern, 'i');
@@ -24,10 +24,17 @@ export default async function findDir({ pattern, dirPath = '.', recursive = true
       return `Error: Invalid regex pattern '${pattern}': ${e.message}`;
     }
 
-    const ignoreList = await getIgnorePatterns();
+    let resolvedPath;
+    try {
+      resolvedPath = safePath(dirPath);
+    } catch (err) {
+      return `Error: ${err.message}`;
+    }
+
+    const rootIgnoreList = await getIgnorePatterns();
     const results = [];
 
-    async function walk(currentPath) {
+    async function walk(currentPath, ignoreList) {
       if (results.length >= finalLimit) return;
 
       let items;
@@ -39,23 +46,24 @@ export default async function findDir({ pattern, dirPath = '.', recursive = true
 
       for (const item of items) {
         if (results.length >= finalLimit) break;
-        if (shouldIgnore(item.name, ignoreList)) continue;
+        if (!isSafeEntry(item, currentPath, ignoreList)) continue;
 
         const fullPath = path.join(currentPath, item.name);
-        
+
         if (item.isDirectory()) {
           if (regex.test(item.name)) {
             results.push(path.relative(process.cwd(), fullPath));
           }
-          
+
           if (recursive) {
-            await walk(fullPath);
+            const childIgnores = await loadNestedIgnores(fullPath, ignoreList);
+            await walk(fullPath, childIgnores);
           }
         }
       }
     }
 
-    await walk(dirPath);
+    await walk(resolvedPath, rootIgnoreList);
 
     if (results.length === 0) {
       return `No directories found matching "${pattern}" in "${dirPath}".`;

@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { getIgnorePatterns, shouldIgnore } from '../../utils/fsUtils.js';
+import { getIgnorePatterns, isSafeEntry, loadNestedIgnores, safePath } from '../../utils/fsUtils.js';
 
 /**
  * findFile tool: Finds files by name using regex.
@@ -13,10 +13,10 @@ import { getIgnorePatterns, shouldIgnore } from '../../utils/fsUtils.js';
 export default async function findFile({ pattern, dirPath = '.', recursive = true, limit = 15 }) {
   try {
     if (!pattern) return "Error: Search pattern cannot be empty.";
-    
+
     // Enforce max limit of 15
     const finalLimit = Math.min(limit, 15);
-    
+
     let regex;
     try {
       regex = new RegExp(pattern, 'i');
@@ -24,11 +24,17 @@ export default async function findFile({ pattern, dirPath = '.', recursive = tru
       return `Error: Invalid regex pattern '${pattern}': ${e.message}`;
     }
 
-    const ignoreList = await getIgnorePatterns();
-    const results = [];
-    let totalFound = 0;
+    let resolvedPath;
+    try {
+      resolvedPath = safePath(dirPath);
+    } catch (err) {
+      return `Error: ${err.message}`;
+    }
 
-    async function walk(currentPath) {
+    const rootIgnoreList = await getIgnorePatterns();
+    const results = [];
+
+    async function walk(currentPath, ignoreList) {
       if (results.length >= finalLimit) return;
 
       let items;
@@ -40,13 +46,14 @@ export default async function findFile({ pattern, dirPath = '.', recursive = tru
 
       for (const item of items) {
         if (results.length >= finalLimit) break;
-        if (shouldIgnore(item.name, ignoreList)) continue;
+        if (!isSafeEntry(item, currentPath, ignoreList)) continue;
 
         const fullPath = path.join(currentPath, item.name);
-        
+
         if (item.isDirectory()) {
           if (recursive) {
-            await walk(fullPath);
+            const childIgnores = await loadNestedIgnores(fullPath, ignoreList);
+            await walk(fullPath, childIgnores);
           }
         } else if (item.isFile()) {
           if (regex.test(item.name)) {
@@ -56,7 +63,7 @@ export default async function findFile({ pattern, dirPath = '.', recursive = tru
       }
     }
 
-    await walk(dirPath);
+    await walk(resolvedPath, rootIgnoreList);
 
     if (results.length === 0) {
       return `No files found matching "${pattern}" in "${dirPath}".`;

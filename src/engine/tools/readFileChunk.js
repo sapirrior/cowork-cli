@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
 import { Buffer } from 'buffer';
+import { safePath } from '../../utils/fsUtils.js';
 
 /**
  * Implementation of the readFileChunk tool.
@@ -10,22 +11,29 @@ import { Buffer } from 'buffer';
  * @returns {Promise<string>} File chunk or error message.
  */
 export default async function readFileChunk({ filePath, startLine, endLine }) {
+  let resolvedPath;
   try {
-    const stats = await fs.stat(filePath);
+    resolvedPath = safePath(filePath);
+  } catch (err) {
+    return `Error: ${err.message}`;
+  }
+
+  try {
+    const stats = await fs.stat(resolvedPath);
     if (!stats.isFile()) return `Error: '${filePath}' is not a file.`;
 
     // Binary check: read first 1KB and look for null bytes
-    const handle = await fs.open(filePath, 'r');
+    const handle = await fs.open(resolvedPath, 'r');
     const { bytesRead, buffer } = await handle.read(Buffer.alloc(1024), 0, 1024, 0);
     await handle.close();
-    
+
     for (let i = 0; i < bytesRead; i++) {
       if (buffer[i] === 0) return `Error: '${filePath}' appears to be a binary file. Reading binary files is not supported.`;
     }
 
-    const data = await fs.readFile(filePath, 'utf8');
+    const data = await fs.readFile(resolvedPath, 'utf8');
     const lines = data.split('\n');
-    
+
     // Boundary validation
     const totalLines = lines.length;
     const actualStart = Math.max(1, startLine);

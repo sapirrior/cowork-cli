@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
 import { Buffer } from 'buffer';
+import { safePath } from '../../utils/fsUtils.js';
 
 const MAX_FILE_SIZE = 1024 * 1024; // 1MB limit
 
@@ -10,9 +11,16 @@ const MAX_FILE_SIZE = 1024 * 1024; // 1MB limit
  * @returns {Promise<string>} File content or error message.
  */
 export default async function readFile({ filePath }) {
+  let resolvedPath;
   try {
-    const stats = await fs.stat(filePath);
-    
+    resolvedPath = safePath(filePath);
+  } catch (err) {
+    return `Error: ${err.message}`;
+  }
+
+  try {
+    const stats = await fs.stat(resolvedPath);
+
     if (!stats.isFile()) {
       return `Error: '${filePath}' is not a file.`;
     }
@@ -22,17 +30,17 @@ export default async function readFile({ filePath }) {
     }
 
     // Binary check: read first 1KB and look for null bytes
-    const handle = await fs.open(filePath, 'r');
+    const handle = await fs.open(resolvedPath, 'r');
     const { bytesRead, buffer } = await handle.read(Buffer.alloc(1024), 0, 1024, 0);
     await handle.close();
-    
+
     for (let i = 0; i < bytesRead; i++) {
       if (buffer[i] === 0) {
         return `Error: '${filePath}' appears to be a binary file. Reading binary files is not supported.`;
       }
     }
 
-    const content = await fs.readFile(filePath, 'utf8');
+    const content = await fs.readFile(resolvedPath, 'utf8');
     return content;
   } catch (err) {
     if (err.code === 'ENOENT') return `Error: File not found at '${filePath}'.`;

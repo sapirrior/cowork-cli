@@ -75,22 +75,32 @@ Located under [src/engine/tools/](file:///data/data/com.termux/files/home/works/
   * Returns `{ confirmed: true|false }` or `{ confirmed: false, dismissed: true }` on cancellation.
 * [findDir.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/tools/findDir.js)
   * Searches directory names recursively matching a regex pattern. Results are capped at 15 matches.
+  * Validates the root path with `safePath` before any `fs` call, blocking traversal outside the project.
+  * Uses `isSafeEntry` per entry (rejects symlinks, ignored names, sandbox escapes) and merges nested `.gitignore` files via `loadNestedIgnores` when recursing into subdirectories.
 * [findFile.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/tools/findFile.js)
   * Finds files recursively matching a regex pattern on their filename. Results are capped at 15 matches.
+  * Validates the root path with `safePath` before any `fs` call, blocking traversal outside the project.
+  * Uses `isSafeEntry` per entry (rejects symlinks, ignored names, sandbox escapes) and merges nested `.gitignore` files via `loadNestedIgnores` when recursing into subdirectories.
 * [listTools.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/tools/listTools.js)
   * Lists all available tools, usage examples, and when to use them.
 * [projectTree.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/tools/projectTree.js)
   * Generates a folder structure representation. Stops recursion at depth 10 or 500 items.
+  * Validates the root path with `safePath` (replaces the previous bare `path.resolve`).
+  * Uses `isSafeEntry` per entry and merges nested `.gitignore` files via `loadNestedIgnores` before each recursive `buildTree` call.
 * [readDir.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/tools/readDir.js)
   * Returns contents of a directory, prefixing folders with `[D]` and files with `[F]`.
+  * Validates the path with `safePath` and filters entries through `isSafeEntry` (symlink rejection + ignore + sandbox).
 * [readFile.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/tools/readFile.js)
   * Reads full file contents. Limits reads to files under 1MB.
   * Scans the first 1KB of the file for null bytes (`0`) to reject binary files.
+  * Validates the path with `safePath` before any `fs` call, blocking path traversal.
 * [readFileChunk.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/tools/readFileChunk.js)
   * Reads specific lines (1-based range) from a file. Includes the same binary check as `readFile.js`.
+  * Validates the path with `safePath` before any `fs` call, blocking path traversal.
 * [searchText.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/tools/searchText.js)
   * Searches file contents recursively for matching regex lines.
   * Skips binary files and enforces limits: max 20 matches per file, max 100 matches total, and max recursion depth of 10.
+  * Validates the root path with `safePath` and uses `isSafeEntry` + `loadNestedIgnores` inside the recursive walk.
 * [webFetch.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/tools/webFetch.js)
   * Fetches and cleans text from public URLs.
   * **SSRF Protection:** Resolves hosts using `dns.lookup` and parses IPs to ensure they are strictly in the public `unicast` range. link-local, loopback, private, benchmark, and multicast addresses are blocked.

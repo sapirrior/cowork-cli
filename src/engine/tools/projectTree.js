@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { getIgnorePatterns, shouldIgnore } from '../../utils/fsUtils.js';
+import { getIgnorePatterns, isSafeEntry, loadNestedIgnores, safePath } from '../../utils/fsUtils.js';
 
 const MAX_DEPTH = 10;
 const MAX_ITEMS = 500;
@@ -15,17 +15,23 @@ export default async function projectTree({ dirPath }) {
   let itemCount = 0;
   let isTruncated = false;
 
+  let absolutePath;
   try {
-    const absolutePath = path.resolve(dirPath);
+    absolutePath = safePath(dirPath);
+  } catch (err) {
+    return `Error: ${err.message}`;
+  }
+
+  try {
     const stats = await fs.stat(absolutePath);
-    
+
     if (!stats.isDirectory()) {
       return `Error: '${dirPath}' is not a directory.`;
     }
 
-    const ignoreList = await getIgnorePatterns();
+    const rootIgnoreList = await getIgnorePatterns();
 
-    async function buildTree(currentDir, depth = 0, currentPrefix = '') {
+    async function buildTree(currentDir, depth = 0, currentPrefix = '', ignoreList = rootIgnoreList) {
       if (depth > MAX_DEPTH || itemCount >= MAX_ITEMS) {
         if (itemCount >= MAX_ITEMS) isTruncated = true;
         return '';
@@ -40,7 +46,7 @@ export default async function projectTree({ dirPath }) {
       }
 
       const filteredItems = items
-        .filter(item => !shouldIgnore(item.name, ignoreList))
+        .filter(item => isSafeEntry(item, currentDir, ignoreList))
         .sort((a, b) => {
           if (a.isDirectory() && !b.isDirectory()) return -1;
           if (!a.isDirectory() && b.isDirectory()) return 1;
@@ -64,7 +70,8 @@ export default async function projectTree({ dirPath }) {
 
         if (item.isDirectory()) {
           const fullPath = path.join(currentDir, item.name);
-          result += await buildTree(fullPath, depth + 1, currentPrefix + childPrefix);
+          const childIgnores = await loadNestedIgnores(fullPath, ignoreList);
+          result += await buildTree(fullPath, depth + 1, currentPrefix + childPrefix, childIgnores);
         }
       }
       return result;
@@ -72,7 +79,7 @@ export default async function projectTree({ dirPath }) {
 
     const rootName = path.basename(absolutePath) || absolutePath;
     const tree = await buildTree(absolutePath);
-    
+
     let finalOutput = `${rootName}/\n${tree || '└(empty)'}`;
     finalOutput = finalOutput.trimEnd();
 

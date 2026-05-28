@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { Buffer } from 'buffer';
-import { getIgnorePatterns, shouldIgnore } from '../../utils/fsUtils.js';
+import { getIgnorePatterns, isSafeEntry, loadNestedIgnores, safePath } from '../../utils/fsUtils.js';
 
 const MAX_MATCHES_PER_FILE = 20;
 const MAX_TOTAL_MATCHES = 100;
@@ -14,8 +14,15 @@ export default async function searchText({ pattern, path: searchPath, recursive 
   let totalMatches = 0;
   let isTruncated = false;
 
+  let resolvedPath;
   try {
-    const stats = await fs.stat(searchPath);
+    resolvedPath = safePath(searchPath);
+  } catch (err) {
+    return `Error: ${err.message}`;
+  }
+
+  try {
+    const stats = await fs.stat(resolvedPath);
     if (!pattern) return "Error: Search pattern cannot be empty.";
 
     let regex;
@@ -25,15 +32,15 @@ export default async function searchText({ pattern, path: searchPath, recursive 
       return `Error: Invalid regex pattern '${pattern}': ${e.message}`;
     }
 
-    const ignoreList = await getIgnorePatterns();
+    const rootIgnoreList = await getIgnorePatterns();
     const results = [];
 
-    const walk = async (currentPath, depth = 0) => {
+    const walk = async (currentPath, depth = 0, ignoreList = rootIgnoreList) => {
       if (totalMatches >= MAX_TOTAL_MATCHES) {
         isTruncated = true;
         return;
       }
-      
+
       if (depth > MAX_DEPTH) return;
 
       let items;
@@ -49,13 +56,14 @@ export default async function searchText({ pattern, path: searchPath, recursive 
           break;
         }
 
-        if (shouldIgnore(item.name, ignoreList)) continue;
+        if (!isSafeEntry(item, currentPath, ignoreList)) continue;
 
         const fullPath = path.join(currentPath, item.name);
 
         if (item.isDirectory()) {
           if (recursive || depth === 0) {
-            await walk(fullPath, depth + 1);
+            const childIgnores = await loadNestedIgnores(fullPath, ignoreList);
+            await walk(fullPath, depth + 1, childIgnores);
           }
         } else if (item.isFile()) {
           const fileMatches = await searchInFile(fullPath, regex);
@@ -73,18 +81,18 @@ export default async function searchText({ pattern, path: searchPath, recursive 
     };
 
     if (stats.isFile()) {
-      const fileMatches = await searchInFile(searchPath, regex);
+      const fileMatches = await searchInFile(resolvedPath, regex);
       if (fileMatches.length > 0) {
         const allowed = Math.min(fileMatches.length, MAX_TOTAL_MATCHES);
         results.push({
-          file: path.relative(process.cwd(), searchPath),
+          file: path.relative(process.cwd(), resolvedPath),
           matches: fileMatches.slice(0, allowed)
         });
         totalMatches = allowed;
         if (fileMatches.length > allowed) isTruncated = true;
       }
     } else {
-      await walk(searchPath);
+      await walk(resolvedPath);
     }
 
     if (results.length === 0) return "No matches found.";
@@ -99,7 +107,6 @@ export default async function searchText({ pattern, path: searchPath, recursive 
 
     return output;
 
-
   } catch (err) {
     if (err.code === 'ENOENT') return `Error: Path not found at '${searchPath}'.`;
     return `Error searching text: ${err.message}`;
@@ -111,7 +118,7 @@ async function searchInFile(filePath, regex) {
     const handle = await fs.open(filePath, 'r');
     const { bytesRead, buffer } = await handle.read(Buffer.alloc(1024), 0, 1024, 0);
     await handle.close();
-    
+
     for (let i = 0; i < bytesRead; i++) {
       if (buffer[i] === 0) return []; // Skip binary
     }
@@ -119,7 +126,7 @@ async function searchInFile(filePath, regex) {
     const content = await fs.readFile(filePath, 'utf8');
     const lines = content.split('\n');
     const matches = [];
-    
+
     for (let i = 0; i < lines.length; i++) {
       if (regex.test(lines[i])) {
         matches.push(`${i + 1}:${lines[i].trim()}`);
