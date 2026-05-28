@@ -56,6 +56,7 @@ cwk "Explain the data flow in the engine/ models"
 - **Zero-Whitespace UI**: High-density terminal output designed for professionals. No fluff, no headers, just data.
 - **Interactive Feedback**: The AI can request clarifications via the `askUser` tool or trigger an interactive `[ Yes ]  No` toggle using `askConfirm`.
 - **Smart Discovery**: Built-in `searchText`, `findFile`, and `projectTree` tools that respect your `.gitignore`.
+- **Web Research**: Dynamically search the web (`webSearch`) and read documentation (`webFetch`) directly from the CLI.
 - **Surgical I/O**: Read entire files or specific line ranges (`readFileChunk`) with automatic binary detection.
 - **Piping Support**: Pipe logs or diffs directly into `cwk` for instant analysis.
 

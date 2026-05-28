@@ -99,13 +99,18 @@ Located under [src/engine/tools/](file:///data/data/com.termux/files/home/works/
   * Validates the path with `safePath` before any `fs` call, blocking path traversal.
 * [searchText.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/tools/searchText.js)
   * Searches file contents recursively for matching regex lines.
-  * Skips binary files and enforces limits: max 20 matches per file, max 100 matches total, and max recursion depth of 10.
+  * Groups matches into context windows (default: 2 lines, max: 5) and merges overlapping windows to provide surrounding code context without duplicating lines.
+  * Skips binary files and enforces limits: max 20 match groups per file, max 100 matches total, and max recursion depth of 10.
   * Validates the root path with `safePath` and uses `isSafeEntry` + `loadNestedIgnores` inside the recursive walk.
 * [webFetch.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/tools/webFetch.js)
   * Fetches and cleans text from public URLs.
   * **SSRF Protection:** Resolves hosts using `dns.lookup` and parses IPs to ensure they are strictly in the public `unicast` range. link-local, loopback, private, benchmark, and multicast addresses are blocked.
   * Manually follows redirects up to 5 hops, validating safety at each redirect hop.
   * Strips HTML tags (scripts, styles, headers, footers, etc.) and truncates text to 15,000 characters.
+* [webSearch.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/tools/webSearch.js)
+  * Zero-dependency web search tool that parses DuckDuckGo HTML results (`html.duckduckgo.com`).
+  * Extracts the title, direct URL (cleaning DDG trackers), and snippet summary via block-level regex parsing.
+  * Enforces a hard timeout and limits output (default 5 results, max 20).
 
 ### 🔧 Utility Modules
 Located under [src/utils/](file:///data/data/com.termux/files/home/works/cwk/src/utils/):

@@ -41,6 +41,12 @@ export default async function listTools() {
       whenToUse: "To gather information from online documentation, API references, or external technical articles."
     },
     {
+      name: "webSearch",
+      usage: "webSearch({ query: 'nodejs fetch api example', limit: 5 })",
+      description: "Searches the web dynamically and returns a list of titles, direct URLs, and snippet summaries (default: 5, max: 20).",
+      whenToUse: "When you need to search the web for external documentation, solutions, or API references before using webFetch to read a specific page."
+    },
+    {
       name: "findFile",
       usage: "findFile({ pattern: 'config.*\\\\.js$', dirPath: 'src/', limit: 10 })",
       description: "Finds files by name using regex. Supports recursion and respects .gitignore. Max 15 results.",

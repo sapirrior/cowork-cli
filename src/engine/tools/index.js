@@ -4,6 +4,7 @@ import projectTree from './projectTree.js';
 import readFileChunk from './readFileChunk.js';
 import searchText from './searchText.js';
 import webFetch from './webFetch.js';
+import webSearch from './webSearch.js';
 import listTools from './listTools.js';
 import findFile from './findFile.js';
 import findDir from './findDir.js';
@@ -103,6 +104,21 @@ export const toolDefinitions = [
   {
     type: "function",
     function: {
+      name: "webSearch",
+      description: "Search the web to find URLs, docs, and solutions. Returns a list of titles, URLs, and snippet summaries. Always use this first to find a URL before calling webFetch.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "The search term/query." },
+          limit: { type: "number", description: "Max results to return (default: 5, max: 20)." }
+        },
+        required: ["query"]
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "listTools",
       description: "List all available tools and usage guidelines.",
       parameters: {
@@ -183,6 +199,7 @@ const toolImplementations = {
   readFileChunk,
   searchText,
   webFetch,
+  webSearch,
   listTools,
   findFile,
   findDir,
