@@ -108,8 +108,14 @@ Located under [src/utils/](file:///data/data/com.termux/files/home/works/cwk/src
     * **Model Type:** `CWK_MODEL_TYPE`, `MODEL_TYPE`
   * Validates configuration schema (`openai` or `gemini` types) and runs connectivity checks via `client.models.list()`.
 * [fsUtils.js](file:///data/data/com.termux/files/home/works/cwk/src/utils/fsUtils.js)
-  * Reads `.gitignore` patterns in the current working directory.
-  * Combines them with built-in default ignores (`.git`, `node_modules`, `dist`, `build`, `.npm`, `.DS_Store`) to determine whether paths should be skipped.
+  * **Ignore-pattern engine** — parses `.gitignore` files into structured pattern objects supporting globs (`*`, `**`, `?`, `[…]`), directory-only markers (`build/`), and full negation (`!important.log`). Uses a zero-dependency `globToRegex` converter.
+  * **Expanded default ignores:** `.git`, `.svn`, `.hg`, `node_modules`, `dist`, `build`, `.npm`, `.DS_Store`, `Thumbs.db`, `.env`, `.env.*`, `coverage`, `__pycache__`, `.cache`, `.vscode`, `.idea`.
+  * `getIgnorePatterns()` — loads defaults + root `.gitignore`, caches the result for the process lifetime. Rejects `.gitignore` files larger than 64 KB and strips `\r` line endings.
+  * `shouldIgnore(name, ignoreList, options?)` — glob-aware, negation-aware matching. Processes patterns sequentially (last match wins). Accepts optional `{ isDirectory }` for directory-only enforcement; omitting it preserves backward compatibility.
+  * `loadNestedIgnores(dirPath, parentList)` — reads a `.gitignore` in a subdirectory and merges its patterns after the parent list, enabling recursive ignore discovery by callers.
+  * `safePath(inputPath)` — resolves a path against `process.cwd()` and throws if it escapes the project root. Prevents `../` traversal attacks.
+  * `isSafeEntry(dirent, parentPath, ignoreList)` — combined guard that rejects symbolic links, ignored names, and paths resolving outside the sandbox.
+  * `clearIgnoreCache()` — invalidates the cached pattern list.
 * [logger.js](file:///data/data/com.termux/files/home/works/cwk/src/utils/logger.js)
   * Reads the color tokens (`main`, `tool`, `data`, `success`, `error`, `dim`, `header`) from `config.json` and converts them to ANSI TrueColor sequences.
   * Exports `formatMain`, `formatSecondary`, `formatNormal`, `formatError`, `formatDim`, `formatHeader` formatting helpers.
