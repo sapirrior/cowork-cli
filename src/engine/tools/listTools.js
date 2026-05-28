@@ -30,9 +30,9 @@ export default async function listTools() {
     },
     {
       name: "searchText",
-      usage: "searchText({ pattern: 'TODO', path: 'src/', recursive: true })",
-      description: "Performs a regex search for text across files and directories. Respects .gitignore.",
-      whenToUse: "To find variable usages, search for specific strings, or locate technical debt across the codebase."
+      usage: "searchText({ pattern: 'safePath', path: 'src/', recursive: true, context: 3 })",
+      description: "Performs a regex search for text across files and directories. Returns each match with surrounding context lines (default: 2, max: 5). Overlapping context windows are merged. Respects .gitignore.",
+      whenToUse: "To find variable usages, trace function calls, or locate patterns across the codebase. Increase context when you need more surrounding code per match."
     },
     {
       name: "webFetch",
@@ -63,6 +63,12 @@ export default async function listTools() {
       usage: "askUser({ question: 'What is the API endpoint for this service?' })",
       description: "Asks the user a specific question via the terminal and waits for a text response.",
       whenToUse: "When you need specific information, clarification, or feedback from the user that cannot be found in the codebase."
+    },
+    {
+      name: "askConfirm",
+      usage: "askConfirm({ question: 'Should I proceed with deleting this file?' })",
+      description: "Asks the user a yes/no question using an interactive toggle. Returns { confirmed: true } for yes, { confirmed: false } for no, or { confirmed: false, dismissed: true } on cancellation.",
+      whenToUse: "When only a boolean decision is needed from the user. Prefer this over askUser for simple yes/no choices."
     }
   ];
 

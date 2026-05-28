@@ -189,7 +189,10 @@ export default class BaseModel {
         const label = toolLabels[name] || name;
         let displayArg = "";
 
-        if (name === 'searchText') displayArg = `'${args.pattern}' in ${args.path}`;
+        if (name === 'searchText') {
+          const ctx = (args.context != null && args.context !== 2) ? ` [C${args.context}]` : '';
+          displayArg = `'${args.pattern}' in ${args.path}${ctx}`;
+        }
         else if (name === 'findFile' || name === 'findDir') displayArg = `'${args.pattern}' in ${args.dirPath || '.'}`;
         else if (name === 'readFileChunk') displayArg = `${args.filePath} [L${args.startLine}-${args.endLine}]`;
         else displayArg = args.url || args.filePath || args.dirPath || args.path || args.pattern || JSON.stringify(args);

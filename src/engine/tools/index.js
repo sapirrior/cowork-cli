@@ -73,13 +73,14 @@ export const toolDefinitions = [
     type: "function",
     function: {
       name: "searchText",
-      description: "Regex search in files/folders. Supports recursion and .gitignore.",
+      description: "Regex search in files/folders. Returns matching lines with surrounding context lines. Supports recursion and .gitignore.",
       parameters: {
         type: "object",
         properties: {
           pattern: { type: "string", description: "Regex or text pattern." },
           path: { type: "string", description: "File or directory to search." },
-          recursive: { type: "boolean", description: "Search subdirectories? (default: false)" }
+          recursive: { type: "boolean", description: "Search subdirectories? (default: false)" },
+          context: { type: "number", description: "Lines of context around each match (default: 2, max: 5)." }
         },
         required: ["pattern", "path"]
       }
