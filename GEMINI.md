@@ -52,7 +52,7 @@ graph TD
   * Core execution loop handling model interactions.
   * Enforces a maximum limit of 15 turns per query to prevent infinite tool loops.
   * Implements proactive throttling (minimum 1 second between requests).
-  * Performs retry logic with exponential backoff and random jitter for transient errors (429, 500, 502, 503, 504), reading the `retry-after` header if provided.
+  * Performs retry logic with exponential backoff and random jitter for transient errors — covers both HTTP statuses (429, 500, 502, 503, 504) and Node.js-level network errors (`ECONNRESET`, `ETIMEDOUT`, `ECONNREFUSED`, `EAI_AGAIN`, `ENETUNREACH`, `EHOSTUNREACH`), reading the `retry-after` header if provided for HTTP errors.
   * Dispatches tool executions, formats inputs, feeds results back to message history, and handles execution exceptions.
 * [src/engine/models/default.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/models/default.js)
   * Standard handler that inherits directly from `BaseModel` for general OpenAI-compatible endpoints.
