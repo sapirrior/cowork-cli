@@ -207,31 +207,51 @@ export function clearIgnoreCache() {
  * and the **last matching pattern wins**.  Negation patterns (`!`) can
  * therefore un-ignore a previously ignored name.
  *
- * @param {string}   name       Item basename.
- * @param {Object[]} ignoreList Structured pattern objects.
+ * @param {string}   name         Item basename.
+ * @param {Object[]} ignoreList   Structured pattern objects.
  * @param {Object}   [options]
- * @param {boolean}  [options.isDirectory] Whether the item is a directory.
+ * @param {boolean}  [options.isDirectory]   Whether the item is a directory.
  *                   When omitted, directory-only patterns match regardless
  *                   (backward-compatible with existing callers).
+ * @param {string}   [options.relativePath]  Path relative to the project root
+ *                   (e.g. `"src/internal/foo.js"`).  When provided, patterns
+ *                   that contain a `/` are tested against this value instead
+ *                   of being skipped.  When omitted the old skip behaviour is
+ *                   preserved for backward compatibility.
  * @returns {boolean} `true` if the item should be skipped.
  */
 export function shouldIgnore(name, ignoreList, options = {}) {
-  const { isDirectory } = options;
+  const { isDirectory, relativePath } = options;
   let ignored = false;
 
   for (const entry of ignoreList) {
-    // Path-containing patterns (e.g. `docs/internal`) require full
-    // relative-path matching which callers don't supply — skip them.
-    if (entry.hasSlash) continue;
-
     // Directory-only patterns (`build/`) don't apply to files.
     // When `isDirectory` is undefined the caller didn't say, so we match
     // to preserve backward compat with callers that only pass basenames.
     if (entry.dirOnly && isDirectory === false) continue;
 
-    const matches = entry.hasGlob && entry.regex
-      ? entry.regex.test(name)
-      : name === entry.pattern;
+    let matches = false;
+
+    if (entry.hasSlash) {
+      // Path-scoped pattern — needs a full relative path to evaluate.
+      // Without one we conservatively skip it (backward-compatible).
+      if (!relativePath) continue;
+
+      if (entry.hasGlob && entry.regex) {
+        matches = entry.regex.test(relativePath);
+      } else {
+        // Exact segment match: the pattern must equal the relative path
+        // OR appear as a leading path prefix followed by a separator.
+        matches =
+          relativePath === entry.pattern ||
+          relativePath.startsWith(entry.pattern + '/');
+      }
+    } else {
+      // Basename-only pattern — match against the entry name.
+      matches = entry.hasGlob && entry.regex
+        ? entry.regex.test(name)
+        : name === entry.pattern;
+    }
 
     if (matches) {
       ignored = !entry.negated;
@@ -263,7 +283,7 @@ export function safePath(inputPath) {
  *
  * Rejects:
  *  1. Symbolic links (could escape the project sandbox).
- *  2. Names matched by the ignore list.
+ *  2. Names matched by the ignore list (basename AND path-scoped patterns).
  *  3. Paths that resolve outside `process.cwd()`.
  *
  * @param {import('fs').Dirent} dirent      Directory entry from `readdir`.
@@ -274,12 +294,15 @@ export function safePath(inputPath) {
 export function isSafeEntry(dirent, parentPath, ignoreList) {
   if (dirent.isSymbolicLink()) return false;
 
-  const isDir = dirent.isDirectory();
-  if (shouldIgnore(dirent.name, ignoreList, { isDirectory: isDir })) return false;
-
-  const resolved = path.resolve(parentPath, dirent.name);
   const root = process.cwd();
+  const resolved = path.resolve(parentPath, dirent.name);
   if (resolved !== root && !resolved.startsWith(root + path.sep)) return false;
+
+  const isDir = dirent.isDirectory();
+  // Compute the relative path so shouldIgnore() can evaluate path-scoped
+  // patterns like `tests/fixtures/` in addition to bare-name patterns.
+  const relativePath = path.relative(root, resolved);
+  if (shouldIgnore(dirent.name, ignoreList, { isDirectory: isDir, relativePath })) return false;
 
   return true;
 }

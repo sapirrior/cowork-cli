@@ -126,7 +126,7 @@ Located under [src/utils/](file:///data/data/com.termux/files/home/works/cwk/src
   * **Ignore-pattern engine** — parses `.gitignore` files into structured pattern objects supporting globs (`*`, `**`, `?`, `[…]`), directory-only markers (`build/`), and full negation (`!important.log`). Uses a zero-dependency `globToRegex` converter.
   * **Expanded default ignores:** `.git`, `.svn`, `.hg`, `node_modules`, `dist`, `build`, `.npm`, `.DS_Store`, `Thumbs.db`, `.env`, `.env.*`, `coverage`, `__pycache__`, `.cache`, `.vscode`, `.idea`.
   * `getIgnorePatterns()` — loads defaults + root `.gitignore`, caches the result for the process lifetime. Rejects `.gitignore` files larger than 64 KB and strips `\r` line endings.
-  * `shouldIgnore(name, ignoreList, options?)` — glob-aware, negation-aware matching. Processes patterns sequentially (last match wins). Accepts optional `{ isDirectory }` for directory-only enforcement; omitting it preserves backward compatibility.
+  * `shouldIgnore(name, ignoreList, options?)` — glob-aware, negation-aware matching. Processes patterns sequentially (last match wins). Accepts optional `{ isDirectory, relativePath }` to evaluate path-scoped patterns (like `src/tests/`) and directory-only enforcement; omitting them preserves backward compatibility.
   * `loadNestedIgnores(dirPath, parentList)` — reads a `.gitignore` in a subdirectory and merges its patterns after the parent list, enabling recursive ignore discovery by callers.
   * `safePath(inputPath)` — resolves a path against `process.cwd()` and throws if it escapes the project root. Prevents `../` traversal attacks.
   * `isSafeEntry(dirent, parentPath, ignoreList)` — combined guard that rejects symbolic links, ignored names, and paths resolving outside the sandbox.
