@@ -1,3 +1,5 @@
+import { parse } from 'node-html-parser';
+
 const TIMEOUT_MS = 10000;
 const MAX_RESULTS_HARD_LIMIT = 20;
 
@@ -38,23 +40,20 @@ export default async function webSearch({ query, limit = 5 }) {
     const html = await response.text();
     const results = [];
     
-    // Split HTML into result blocks. 
-    // The slice(1) skips the header block before the first result.
-    const blocks = html.split('class="links_main links_deep result__body"').slice(1);
+    const root = parse(html);
+    const resultNodes = root.querySelectorAll('.result__body');
     
-    for (const block of blocks) {
+    for (const node of resultNodes) {
       if (results.length >= maxLimit) break;
       
-      const titleMatch = block.match(/<h2 class="result__title">[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i);
-      const snippetMatch = block.match(/<a class="result__snippet[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
+      const titleEl = node.querySelector('.result__title a');
+      const snippetEl = node.querySelector('.result__snippet');
       
-      if (titleMatch && snippetMatch) {
-        // Strip nested HTML tags (like <b> tags for highlighted keywords)
-        const title = titleMatch[1].replace(/<[^>]+>/g, '').trim();
-        const snippet = snippetMatch[2].replace(/<[^>]+>/g, '').trim();
+      if (titleEl && snippetEl) {
+        const title = titleEl.textContent.replace(/\s+/g, ' ').trim();
+        const snippet = snippetEl.textContent.replace(/\s+/g, ' ').trim();
         
-        // Clean DuckDuckGo's tracking wrapper from the URL
-        let url = snippetMatch[1];
+        let url = titleEl.getAttribute('href') || '';
         if (url.startsWith('//duckduckgo.com/l/?uddg=')) {
           url = decodeURIComponent(url.split('uddg=')[1].split('&')[0]);
         }

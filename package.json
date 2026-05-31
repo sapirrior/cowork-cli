@@ -1,6 +1,6 @@
 {
   "name": "cowork-cli",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "description": "work with cowork",
   "bin": {
     "cwk": "bin/cli.js"
