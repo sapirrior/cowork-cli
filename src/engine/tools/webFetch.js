@@ -1,6 +1,7 @@
 import { lookup } from 'node:dns/promises';
 import { URL } from 'node:url';
 import ipaddr from 'ipaddr.js';
+import { parse } from 'node-html-parser';
 
 const MAX_CHARS = 15000;
 const TIMEOUT_MS = 10000;
@@ -117,16 +118,12 @@ export default async function webFetch({ url }) {
 
       // 5. HTML Stripping (Aggressive for context awareness)
       if (contentType.includes('text/html')) {
-        text = text
-          .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-          .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-          .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, '')
-          .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, '')
-          .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, '')
-          .replace(/<aside\b[^<]*(?:(?!<\/aside>)<[^<]*)*<\/aside>/gi, '')
-          .replace(/<[^>]+>/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
+        const root = parse(text);
+        root.querySelectorAll('script, style, nav, header, footer, aside').forEach(el => el.remove());
+        text = root.textContent;
+        text = text.replace(/<!DOCTYPE\b[^>]*>/gi, '');
+        text = text.replace(/<\?xml\b[^>]*>/gi, '');
+        text = text.replace(/\s+/g, ' ').trim();
       } else if (contentType.includes('application/json')) {
         try {
           text = JSON.stringify(JSON.parse(text), null, 2);
