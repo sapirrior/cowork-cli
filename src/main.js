@@ -15,8 +15,20 @@ const PKG_PATH = path.join(__dirname, '../package.json');
  * @param {string[]} args Command line arguments.
  */
 export default async function main(args) {
+  let pipedData = '';
+  if (!process.stdin.isTTY) {
+    try {
+      for await (const chunk of process.stdin) {
+        pipedData += chunk;
+      }
+      pipedData = pipedData.trim();
+    } catch (err) {
+      logger.error(`Error reading from stdin: ${err.message}`);
+    }
+  }
+
   // Handle empty arguments or help flags
-  if (args.length === 0 || args[0] === '-h' || args[0] === '--help') {
+  if ((args.length === 0 && !pipedData) || args[0] === '-h' || args[0] === '--help') {
     show_help();
     return;
   }
@@ -33,7 +45,12 @@ export default async function main(args) {
   }
 
   // Handle query execution
-  const query = args[0];
+  let query = args.join(' ').trim();
+  if (pipedData) {
+    query = query
+      ? `${query}\n\n[Piped Input]:\n${pipedData}`
+      : `Analyze the following data:\n\n[Piped Input]:\n${pipedData}`;
+  }
   const config = loadConfig();
 
   // clientLoader handles config validation and throws if invalid
