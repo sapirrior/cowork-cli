@@ -199,7 +199,10 @@ export default class BaseModel {
           webSearch: 'searching web',
           findFile: 'finding',
           findDir: 'finding',
-          listTools: 'listing'
+          listTools: 'listing',
+          gitDiff: 'git diff',
+          gitLog: 'git log',
+          gitStatus: 'git status',
         };
 
         const label = toolLabels[name] || name;
@@ -212,6 +215,11 @@ export default class BaseModel {
         else if (name === 'webSearch') displayArg = `'${args.query}'`;
         else if (name === 'findFile' || name === 'findDir') displayArg = `'${args.pattern}' in ${args.dirPath || '.'}`;
         else if (name === 'readFileChunk') displayArg = `${args.filePath} [L${args.startLine}-${args.endLine}]`;
+        else if (name === 'gitDiff') {
+          const scope = args.staged ? 'staged' : 'unstaged';
+          displayArg = args.filePath ? `${scope} · ${args.filePath}` : scope;
+        }
+        else if (name === 'gitLog') displayArg = `last ${args.limit ?? 10} commits`;
         else displayArg = args.url || args.filePath || args.dirPath || args.path || args.pattern || JSON.stringify(args);
 
         // ui.start() handles terminal-aware truncation internally.

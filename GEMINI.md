@@ -73,6 +73,21 @@ Located under [src/engine/tools/](file:///data/data/com.termux/files/home/works/
   * Prompting interface that asks the user a yes/no question using a sleek interactive toggle.
   * Delegates entirely to `ui.confirm()` from the `UIEngine` singleton.
   * Returns `{ confirmed: true|false }` or `{ confirmed: false, dismissed: true }` on cancellation.
+* [gitDiff.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/tools/gitDiff.js)
+  * Shows file changes as a unified diff (unstaged by default, or staged via `staged: true`).
+  * Accepts an optional `filePath` validated with `safePath` to limit the diff to a single file.
+  * Runs `git diff [--staged] [-- filePath]` via `execFile` (array args — no shell injection possible). Output capped at `maxLines` (default 300, max 500).
+  * Spinner label: `git diff`.
+* [gitLog.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/tools/gitLog.js)
+  * Returns recent commit history with hash, author, date, and commit message.
+  * Supports a compact `oneline` format and a `limit` (default 10, max 50).
+  * Runs `git log --no-color -n {limit}` via `execFile`.
+  * Spinner label: `git log`.
+* [gitStatus.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/tools/gitStatus.js)
+  * Shows the working tree status grouped into staged changes, unstaged changes, and untracked files.
+  * Runs `git status --porcelain` and parses the two-character XY codes into human-readable labels.
+  * Returns a clean `Working tree is clean` message when there are no changes.
+  * Spinner label: `git status`.
 * [findDir.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/tools/findDir.js)
   * Searches directory names recursively matching a regex pattern. Results are capped at 15 matches.
   * Validates the root path with `safePath` before any `fs` call, blocking traversal outside the project.

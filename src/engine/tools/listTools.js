@@ -75,6 +75,24 @@ export default async function listTools() {
       usage: "askConfirm({ question: 'Should I proceed with deleting this file?' })",
       description: "Asks the user a yes/no question using an interactive toggle. Returns { confirmed: true } for yes, { confirmed: false } for no, or { confirmed: false, dismissed: true } on cancellation.",
       whenToUse: "When only a boolean decision is needed from the user. Prefer this over askUser for simple yes/no choices."
+    },
+    {
+      name: "gitDiff",
+      usage: "gitDiff({ staged: false, filePath: 'src/main.js', maxLines: 300 })",
+      description: "Shows file changes as a unified diff. Defaults to unstaged changes. Pass staged:true for the staging area. Optionally limit to a single validated file path.",
+      whenToUse: "To review what has changed in the working tree or staging area before a commit, or to analyse a specific file's modifications."
+    },
+    {
+      name: "gitLog",
+      usage: "gitLog({ limit: 10, oneline: false })",
+      description: "Returns recent commit history with hash, author, date, and message. Use oneline:true for a compact summary.",
+      whenToUse: "To understand the project's commit history, identify when a change was introduced, or generate a changelog summary."
+    },
+    {
+      name: "gitStatus",
+      usage: "gitStatus({})",
+      description: "Shows the working tree status grouped into staged changes, unstaged changes, and untracked files.",
+      whenToUse: "To get a quick overview of the current repository state before reviewing diffs or logs."
     }
   ];
 

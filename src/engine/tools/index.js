@@ -10,6 +10,9 @@ import findFile from './findFile.js';
 import findDir from './findDir.js';
 import askUser from './askUser.js';
 import askConfirm from './askConfirm.js';
+import gitDiff from './gitDiff.js';
+import gitLog from './gitLog.js';
+import gitStatus from './gitStatus.js';
 
 export const toolDefinitions = [
   {
@@ -189,6 +192,49 @@ export const toolDefinitions = [
         required: ["question"]
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "gitDiff",
+      description: "Show file changes as a unified diff. Use staged:true to see staged changes, or omit for unstaged changes. Optionally limit to a single file.",
+      parameters: {
+        type: "object",
+        properties: {
+          staged:   { type: "boolean", description: "If true, shows staged (index) changes. Default: false (unstaged)." },
+          filePath: { type: "string",  description: "Limit diff to this specific file path (optional)." },
+          maxLines: { type: "number",  description: "Maximum lines of diff output to return (default: 300, max: 500)." }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "gitLog",
+      description: "Show recent commit history. Returns commit hash, author, date, and message.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit:   { type: "number",  description: "Number of commits to retrieve (default: 10, max: 50)." },
+          oneline: { type: "boolean", description: "If true, shows each commit as a compact single line. Default: false." }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "gitStatus",
+      description: "Show the working tree status grouped into staged changes, unstaged changes, and untracked files.",
+      parameters: {
+        type: "object",
+        properties: {},
+        required: []
+      }
+    }
   }
 ];
 
@@ -204,7 +250,10 @@ const toolImplementations = {
   findFile,
   findDir,
   askUser,
-  askConfirm
+  askConfirm,
+  gitDiff,
+  gitLog,
+  gitStatus,
 };
 
 /**
