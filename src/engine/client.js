@@ -19,7 +19,8 @@ function clientLoader() {
   return new OpenAI({
     apiKey: config.model_api_key,
     baseURL: baseURL,
-    timeout: 60000 // 60 seconds timeout
+    timeout: 60000, // 60 seconds timeout
+    maxRetries: 0,  // Disable SDK's built-in retries to prevent overlapping attempts with BaseModel's retry loop.
   });
 }
 

@@ -1,7 +1,21 @@
 import { toolDefinitions, dispatchTool } from '../tools/index.js';
-import { logger } from '../../utils/logger.js';
+import { logger, formatMain, formatDim } from '../../utils/logger.js';
 import { ui } from '../../utils/ui.js';
 import { outputFormatted } from '../../utils/outputFormatter.js';
+
+// Defined at module scope: avoid re-allocating on every caught error.
+// Transient Node.js-level network error codes that warrant an automatic retry.
+const TRANSIENT_NET_CODES = new Set([
+  'ECONNRESET',    // Connection forcibly closed by the remote side
+  'ETIMEDOUT',     // Connection or operation timed out
+  'ECONNREFUSED',  // Remote host actively refused the connection
+  'EAI_AGAIN',     // Temporary DNS resolution failure
+  'ENETUNREACH',   // Network is unreachable
+  'EHOSTUNREACH',  // Host is unreachable
+]);
+
+// Maximum delay (ms) the backoff is allowed to reach, regardless of retry count.
+const MAX_BACKOFF_MS = 30000;
 
 /**
  * Base class for AI model interaction handlers.
@@ -18,6 +32,8 @@ export default class BaseModel {
     this.messages = [];
     this.maxTurns = 15; // Safeguard against infinite tool-calling loops
     this.lastRequestTime = 0; // For proactive throttling
+    this._runStartTime = 0;
+    this._runUsage = { prompt: 0, completion: 0, total: 0 };
   }
 
   /**
@@ -36,6 +52,10 @@ export default class BaseModel {
    * @param {string|null} systemPrompt Optional system-level instructions.
    */
   async run(query, systemPrompt = null) {
+    // Reset per-run tracking state
+    this._runStartTime = performance.now();
+    this._runUsage = { prompt: 0, completion: 0, total: 0 };
+
     if (systemPrompt) {
       this.addMessage('system', systemPrompt);
     }
@@ -50,7 +70,23 @@ export default class BaseModel {
         const response = await this._getCompletion();
         ui.stop();
 
-        const message = response.choices[0].message;
+        // Guard against empty/null choices (content filter, provider quirks).
+        const choice = response.choices?.[0];
+        if (!choice?.message) {
+          logger.error("[API Error] Received empty or malformed response (no choices).");
+          return;
+        }
+        const message = choice.message;
+        const finishReason = choice.finish_reason;
+
+        // Surface meaningful finish reasons to the user instead of silent behaviour.
+        if (finishReason === 'content_filter') {
+          logger.secondary("[System]: Response was blocked by the provider's content filter.");
+          return;
+        }
+        if (finishReason === 'length') {
+          logger.secondary("[System]: Response was truncated due to token limits.");
+        }
 
         // Let subclasses handle/format the response (e.g. Gemini thought signatures)
         await this.handleResponse(message);
@@ -64,6 +100,7 @@ export default class BaseModel {
               process.stdout.write("\n");
             }
           }
+          this._printStats();
           return;
         }
 
@@ -71,7 +108,9 @@ export default class BaseModel {
         await this._processToolCalls(message.tool_calls);
 
       } catch (err) {
-        ui.stop();
+        // Use ui.fail() (red dot) instead of ui.stop() (green dot) so the
+        // terminal reflects that the turn ended in error. fail() is a no-op when IDLE.
+        ui.fail();
         // Deep error logging for API failures
         if (err.status) {
           logger.error(`[API Error] Status: ${err.status}`);
@@ -87,6 +126,7 @@ export default class BaseModel {
       }
     }
 
+    this._printStats();
     logger.secondary("[System]: Reached maximum conversation turns. Ending session.");
   }
 
@@ -118,39 +158,44 @@ export default class BaseModel {
 
         // Update last request time on successful response
         this.lastRequestTime = Date.now();
+
+        // Accumulate token usage across all turns (usage may be absent on some providers)
+        const u = response.usage;
+        if (u) {
+          this._runUsage.prompt     += u.prompt_tokens     ?? 0;
+          this._runUsage.completion += u.completion_tokens ?? 0;
+          this._runUsage.total      += u.total_tokens      ?? 0;
+        }
+
         return response;
 
       } catch (err) {
         // Transient HTTP status codes (rate-limit, server errors)
         const isHttpTransient = [429, 500, 502, 503, 504].includes(err.status);
-        // Transient Node.js-level network errors (flaky connections, DNS hiccups)
-        const TRANSIENT_NET_CODES = new Set([
-          'ECONNRESET',    // Connection forcibly closed by the remote side
-          'ETIMEDOUT',     // Connection or operation timed out
-          'ECONNREFUSED',  // Remote host actively refused the connection
-          'EAI_AGAIN',     // Temporary DNS resolution failure
-          'ENETUNREACH',   // Network is unreachable
-          'EHOSTUNREACH',  // Host is unreachable
-        ]);
         const isNetTransient = TRANSIENT_NET_CODES.has(err.code);
         const isTransient = isHttpTransient || isNetTransient;
 
         if (isTransient && retries < maxRetries) {
           retries++;
 
-          let delay = Math.pow(2, retries) * 1000;
+          // Cap exponential delay at MAX_BACKOFF_MS to prevent unbounded wait times.
+          let delay = Math.min(Math.pow(2, retries) * 1000, MAX_BACKOFF_MS);
 
           // 2. Adhere to Retry-After header if present (HTTP errors only)
           const retryAfter = err.headers?.['retry-after'];
           if (retryAfter) {
             const seconds = parseInt(retryAfter);
             if (!isNaN(seconds)) {
-              delay = seconds * 1000;
+              // Clamp to [1s, MAX_BACKOFF_MS] so a zero/negative header cannot bypass throttling
+              // and an absurd value cannot hang the process.
+              delay = Math.min(Math.max(seconds * 1000, 1000), MAX_BACKOFF_MS);
             } else {
               // Handle Date string format
               const retryDate = new Date(retryAfter);
               if (!isNaN(retryDate.getTime())) {
-                delay = Math.max(0, retryDate.getTime() - Date.now());
+                // Clamp — past dates become 1s, far-future dates are capped at MAX_BACKOFF_MS
+                // so the process can never hang indefinitely.
+                delay = Math.min(Math.max(retryDate.getTime() - Date.now(), 1000), MAX_BACKOFF_MS);
               }
             }
           }
@@ -169,6 +214,11 @@ export default class BaseModel {
         throw err;
       }
     }
+
+    // Exhaustion guard — the while loop should always return or throw before
+    // reaching here. If it doesn't (e.g. a future refactor breaks the invariant),
+    // surface an explicit error rather than returning undefined to the caller.
+    throw new Error('_getCompletion: retry loop exhausted without returning a response.');
   }
 
   /**
@@ -252,5 +302,25 @@ export default class BaseModel {
    */
   async handleResponse(message) {
     this.messages.push(message);
+  }
+
+  /**
+   * Prints a compact stats line: elapsed time and cumulative token usage.
+   * Only printed on clean exits (final answer or max-turns). Skipped on errors.
+   * Token counts are omitted silently if the provider did not return usage data.
+   * @private
+   */
+  _printStats() {
+    const elapsed = ((performance.now() - this._runStartTime) / 1000).toFixed(2);
+    const { prompt, completion, total } = this._runUsage;
+
+    const timeStr  = `${formatDim('time')} ${formatMain(elapsed + 's')}`;
+
+    // Only append token info when the provider actually returned usage data
+    const tokenStr = total > 0
+      ? ` ${formatDim('·')} ${formatDim('tokens')} ${formatMain(String(total))} ${formatDim(`(${prompt}p/${completion}c)`)}`
+      : '';
+
+    ui.log(timeStr + tokenStr);
   }
 }

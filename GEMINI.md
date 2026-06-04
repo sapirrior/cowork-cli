@@ -36,6 +36,7 @@ graph TD
 * [src/main.js](file:///data/data/com.termux/files/home/works/cwk/src/main.js)
   * Orchestrates the startup CLI flow.
   * Parses arguments (handles version `-v`/`--version` and help `-h`/`--help` flags).
+  * Reads piped data from stdin and automatically appends it to the user's query.
   * Loads and validates user configurations.
   * Verifies connectivity before executing any queries.
 * [src/engine/run.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/run.js)
@@ -46,6 +47,7 @@ graph TD
   * Initializes the `OpenAI` client SDK.
   * Trims trailing slashes from the API base URL to prevent endpoint structure issues.
   * Sets an API request timeout limit of 60 seconds.
+  * Disables the SDK's built-in retry mechanism (`maxRetries: 0`) to prevent stacking with `BaseModel`'s own retry loop.
 
 ### 🧠 Model Handlers
 * [src/engine/models/BaseModel.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/models/BaseModel.js)
@@ -54,6 +56,8 @@ graph TD
   * Implements proactive throttling (minimum 1 second between requests).
   * Performs retry logic with exponential backoff and random jitter for transient errors — covers both HTTP statuses (429, 500, 502, 503, 504) and Node.js-level network errors (`ECONNRESET`, `ETIMEDOUT`, `ECONNREFUSED`, `EAI_AGAIN`, `ENETUNREACH`, `EHOSTUNREACH`), reading the `retry-after` header if provided for HTTP errors.
   * Dispatches tool executions, formats inputs, feeds results back to message history, and handles execution exceptions.
+  * Tracks wall-clock elapsed time (`_runStartTime`) and accumulates token usage (`_runUsage`) across all turns of a single run.
+  * Prints a compact stats footer after every clean exit via `_printStats()`: `time 1.2s · tokens 840 (620p/220c)`. Token counts are omitted silently when the provider does not return usage data (e.g. some local endpoints).
 * [src/engine/models/default.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/models/default.js)
   * Standard handler that inherits directly from `BaseModel` for general OpenAI-compatible endpoints.
 * [src/engine/models/gemini.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/models/gemini.js)
@@ -121,10 +125,10 @@ Located under [src/engine/tools/](file:///data/data/com.termux/files/home/works/
   * Fetches and cleans text from public URLs.
   * **SSRF Protection:** Resolves hosts using `dns.lookup` and parses IPs to ensure they are strictly in the public `unicast` range. link-local, loopback, private, benchmark, and multicast addresses are blocked.
   * Manually follows redirects up to 5 hops, validating safety at each redirect hop.
-  * Strips HTML tags (scripts, styles, headers, footers, etc.) and truncates text to 15,000 characters.
+  * Uses `node-html-parser` to strip HTML tags (scripts, styles, headers, footers, etc.) and truncates text to 15,000 characters.
 * [webSearch.js](file:///data/data/com.termux/files/home/works/cwk/src/engine/tools/webSearch.js)
-  * Zero-dependency web search tool that parses DuckDuckGo HTML results (`html.duckduckgo.com`).
-  * Extracts the title, direct URL (cleaning DDG trackers), and snippet summary via block-level regex parsing.
+  * Web search tool that parses DuckDuckGo HTML results (`html.duckduckgo.com`).
+  * Extracts the title, direct URL (cleaning DDG trackers), and snippet summary using `node-html-parser`.
   * Enforces a hard timeout and limits output (default 5 results, max 20).
 
 ### 🔧 Utility Modules
