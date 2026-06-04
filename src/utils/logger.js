@@ -31,7 +31,7 @@ function hexToAnsi(hex) {
 
 const reset = '\x1b[0m';
 
-const colors = {
+export const colors = {
   main:    hexToAnsi(config.accents.main),
   tool:    hexToAnsi(config.accents.tool),
   data:    hexToAnsi(config.accents.data),

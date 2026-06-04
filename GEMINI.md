@@ -155,8 +155,11 @@ Located under [src/utils/](file:///data/data/com.termux/files/home/works/cwk/src
   * Exports `formatMain`, `formatSecondary`, `formatNormal`, `formatError`, `formatDim`, `formatHeader` formatting helpers.
   * Exports `logger` object with `.main()`, `.secondary()`, `.normal()`, and `.error()` convenience methods.
 * [outputFormatter.js](file:///data/data/com.termux/files/home/works/cwk/src/utils/outputFormatter.js)
-  * Wraps text dynamically based on the current terminal column width (defaults to 80).
-  * Preserves leading indentation spaces and splits long strings/words cleanly to prevent layout breaking.
+  * Responsive, stateful terminal markdown layout formatter (headers, lists, blockquotes, inline styles, code blocks, horizontal rules).
+  * Wraps text dynamically based on current terminal column width: uses 80% width on screens >= 60 cols, scaling up to 95% on narrower terminals.
+  * Employs visual width logic (supports CJK wide characters/emojis) and robust ANSI balancing to prevent layout/style bleeding across wrapped blocks.
+  * Normalizes Carriage Returns (\r) and Tab stops (\t) to keep visual spacing clean.
+  * Protects pre-formatted ANSI sequences (e.g. from tool outputs) by disabling markdown rules.
 * [ui.js](file:///data/data/com.termux/files/home/works/cwk/src/utils/ui.js)
   * `UIEngine` — State-Based Reactive Terminal Interface.
   * **Four states:** `IDLE → SPINNING → IDLE`, `IDLE → THINKING → IDLE`, `IDLE → ASKING → IDLE`.
