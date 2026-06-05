@@ -10,7 +10,7 @@ const COLORS = {
   data:    [194, 198, 197],  // #C2C6C5 – silver  (args, data)
   success: [122, 195, 145],  // #7AC391 – green   (● on stop)
   error:   [224, 112, 112],  // #E07070 – red     (● on fail)
-  dim:     [ 96,  96,  96],  // #606060 – grey    (dim annotations)
+  dim:     [143, 147, 153],  // #8F9399 – cool grey (dim annotations)
   header:  [163, 122, 204],  // #A37ACC – purple  (● header dot)
 };
 

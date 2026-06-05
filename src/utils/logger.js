@@ -16,7 +16,7 @@ try {
       data:    '#C2C6C5',
       success: '#7AC391',
       error:   '#E07070',
-      dim:     '#606060',
+      dim:     '#8F9399',
       header:  '#A37ACC',
     }
   };

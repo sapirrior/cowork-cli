@@ -155,8 +155,8 @@ Located under [src/utils/](file:///data/data/com.termux/files/home/works/cwk/src
   * Exports `formatMain`, `formatSecondary`, `formatNormal`, `formatError`, `formatDim`, `formatHeader` formatting helpers.
   * Exports `logger` object with `.main()`, `.secondary()`, `.normal()`, and `.error()` convenience methods.
 * [outputFormatter.js](file:///data/data/com.termux/files/home/works/cwk/src/utils/outputFormatter.js)
-  * Responsive, stateful terminal markdown layout formatter (headers, lists, blockquotes, inline styles, code blocks, horizontal rules).
-  * Wraps text dynamically based on current terminal column width: uses 80% width on screens >= 60 cols, scaling up to 95% on narrower terminals.
+  * Responsive, stateful terminal markdown layout formatter (headers, lists, blockquotes, inline styles, code blocks, horizontal rules, and tables).
+  * Wraps text dynamically based on the full terminal width minus 2 columns.
   * Employs visual width logic (supports CJK wide characters/emojis) and robust ANSI balancing to prevent layout/style bleeding across wrapped blocks.
   * Normalizes Carriage Returns (\r) and Tab stops (\t) to keep visual spacing clean.
   * Protects pre-formatted ANSI sequences (e.g. from tool outputs) by disabling markdown rules.
@@ -202,7 +202,7 @@ Default UI themes and colors are configured in:
     "data":    "#C2C6C5",
     "success": "#7AC391",
     "error":   "#E07070",
-    "dim":     "#606060",
+    "dim":     "#8F9399",
     "header":  "#A37ACC"
   }
 }

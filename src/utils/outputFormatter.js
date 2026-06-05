@@ -105,16 +105,139 @@ export function outputFormatted(text, overrideWidth) {
     rawWidth = 80;
   }
   
-  let width = rawWidth;
-  if (width >= 60) {
-    width = Math.floor(width * 0.80);
-  } else {
-    width = Math.max(10, Math.floor(width * 0.95));
-  }
+  // Use full terminal width with a small 2-char right margin to prevent
+  // edge-wrapping artifacts on terminals that wrap at the last column.
+  let width = Math.max(10, rawWidth - 2);
   const lines = strText.split('\n');
   const wrappedLines = [];
-  
-  let inCodeBlock = false;
+
+  let inCodeBlock  = false;
+  let tableBuffer  = [];   // accumulates raw pipe-delimited rows
+
+  // ---------------------------------------------------------------------------
+  // Table renderer — called when a table block is complete
+  // ---------------------------------------------------------------------------
+  function renderTable(rawRows) {
+    // Parse each row into trimmed cell strings
+    const parsed = rawRows.map(row => {
+      const cells = row.split('|');
+      // strip the leading/trailing empty strings caused by outer pipes
+      if (cells[0].trim() === '') cells.shift();
+      if (cells[cells.length - 1].trim() === '') cells.pop();
+      return cells.map(c => c.trim());
+    });
+
+    if (parsed.length === 0) return;
+
+    // Identify the separator row (only dashes/colons/pipes) and extract alignment
+    let sepIdx = parsed.findIndex(row =>
+      row.every(c => /^:?-+:?$/.test(c))
+    );
+    if (sepIdx === -1) sepIdx = 1; // assume row 1 is separator if not found
+
+    const alignRow  = parsed[sepIdx] || [];
+    const aligns    = alignRow.map(c => {
+      if (/^:-+:$/.test(c)) return 'center';
+      if (/^-+:$/.test(c))  return 'right';
+      return 'left';
+    });
+
+    const headerRows = parsed.slice(0, sepIdx);
+    const dataRows   = parsed.slice(sepIdx + 1);
+    const allDataRows = [...headerRows, ...dataRows];
+
+    // Determine number of columns
+    const numCols = Math.max(...allDataRows.map(r => r.length), aligns.length);
+
+    // Compute natural column widths (visual length of cell content)
+    const colWidths = Array(numCols).fill(0);
+    for (const row of allDataRows) {
+      for (let i = 0; i < numCols; i++) {
+        const cell = row[i] || '';
+        const cellLen = visualLength(stripAnsi(applyInlineStyles(cell)));
+        if (cellLen > colWidths[i]) colWidths[i] = cellLen;
+      }
+    }
+
+    // Cap table to available width: shrink columns proportionally if needed
+    // Total width = borders(numCols+1) + padding(numCols*2) + sum(colWidths)
+    const borderOverhead = (numCols + 1) + (numCols * 2);
+    const totalNatural   = colWidths.reduce((a, b) => a + b, 0) + borderOverhead;
+    if (totalNatural > width) {
+      const budget = width - borderOverhead;
+      const ratio  = budget / colWidths.reduce((a, b) => a + b, 0);
+      for (let i = 0; i < numCols; i++) {
+        colWidths[i] = Math.max(1, Math.floor(colWidths[i] * ratio));
+      }
+    }
+
+    // Helper: pad/truncate a cell to the target visual width
+    function fitCell(rawText, colW, align) {
+      const styled    = applyInlineStyles(rawText || '');
+      const visLen    = visualLength(stripAnsi(styled));
+      const overflow  = visLen - colW;
+      let content     = styled;
+      if (overflow > 0) {
+        // Truncate the raw text first, then re-style
+        const plain  = stripAnsi(styled);
+        const cut    = plain.slice(0, plain.length - overflow - 1) + '…';
+        content      = applyInlineStyles(rawText.slice(0, cut.length));
+      }
+      const padTotal = colW - Math.min(visLen, colW);
+      if (align === 'right') {
+        return ' '.repeat(padTotal) + content;
+      } else if (align === 'center') {
+        const left  = Math.floor(padTotal / 2);
+        const right = padTotal - left;
+        return ' '.repeat(left) + content + ' '.repeat(right);
+      } else {
+        return content + ' '.repeat(padTotal);
+      }
+    }
+
+    const D  = colors.dim;
+    const R  = reset;
+
+    // Box-drawing helpers
+    const hbar = (w) => '─'.repeat(w + 2); // col width + 2 padding
+
+    // ┌─...─┬─...─┐
+    const topBorder = D + '┌' + colWidths.map(hbar).join('┬') + '┐' + R;
+    // ├─...─┼─...─┤  (after header)
+    const midBorder = D + '├' + colWidths.map(hbar).join('┼') + '┤' + R;
+    // └─...─┴─...─┘
+    const botBorder = D + '└' + colWidths.map(hbar).join('┴') + '┘' + R;
+
+    function buildRow(cells, isHeader) {
+      const parts = colWidths.map((w, i) => {
+        const raw     = cells[i] || '';
+        const align   = aligns[i] || 'left';
+        const fitted  = fitCell(raw, w, align);
+        return isHeader
+          ? ` \x1b[1m${colors.main}${stripAnsi(fitted)}\x1b[22m${R} `
+          : ` ${fitted} `;
+      });
+      return D + '│' + R + parts.join(D + '│' + R) + D + '│' + R;
+    }
+
+    // Add blank line before table if previous line is not blank
+    if (wrappedLines.length > 0 && wrappedLines[wrappedLines.length - 1] !== '') {
+      wrappedLines.push('');
+    }
+
+    wrappedLines.push(topBorder);
+    for (const hrow of headerRows) {
+      wrappedLines.push(buildRow(hrow, true));
+    }
+    if (dataRows.length > 0) {
+      wrappedLines.push(midBorder);
+      for (const drow of dataRows) {
+        wrappedLines.push(buildRow(drow, false));
+      }
+    }
+    wrappedLines.push(botBorder);
+    wrappedLines.push('');
+  }
 
   // Helper function to wrap a string to a specific width (ANSI and wide-char aware)
   function wrapString(content, wrapWidth) {
@@ -188,6 +311,18 @@ export function outputFormatted(text, overrideWidth) {
   }
 
   for (const line of lines) {
+    // --- Table row detection (pipe-delimited, outside code blocks) -----------
+    const isTableRow = !inCodeBlock && /^\s*\|/.test(line);
+    if (isTableRow) {
+      tableBuffer.push(line.trim());
+      continue;
+    }
+    // Flush buffered table when a non-table line is encountered
+    if (tableBuffer.length > 0) {
+      renderTable(tableBuffer);
+      tableBuffer = [];
+    }
+
     // Check if the line already contains ANSI escape formatting (e.g., pre-colored command outputs)
     const hasAnsi = /\x1b\[[0-9;]*[a-zA-Z]/.test(line);
     if (hasAnsi) {
@@ -201,9 +336,7 @@ export function outputFormatted(text, overrideWidth) {
 
     // 1. Detect Horizontal Rules (e.g., ---, ***, ___ )
     if (line.match(/^(\s*)([-*_])\2\2+(\s*)$/)) {
-      const dividerWidth = Math.min(40, width);
-      const padding = ' '.repeat(Math.max(0, Math.floor((width - dividerWidth) / 2)));
-      wrappedLines.push(`${padding}${colors.dim}${'· '.repeat(dividerWidth / 2)}${reset}`);
+      wrappedLines.push(`${colors.dim}${'─'.repeat(width)}${reset}`);
       continue;
     }
 
@@ -211,13 +344,12 @@ export function outputFormatted(text, overrideWidth) {
     if (line.trim().startsWith('```')) {
       if (!inCodeBlock) {
         inCodeBlock = true;
-        const lang = line.trim().substring(3) || 'code';
-        const borderLength = Math.max(5, Math.min(30, width - lang.length - 7));
-        wrappedLines.push(`${colors.dim}┌── [${colors.tool}${lang}${colors.dim}] ${'─'.repeat(borderLength)}${reset}`);
+        const lang = line.trim().substring(3).trim();
+        if (lang) {
+          wrappedLines.push(`${colors.dim}  ${lang}${reset}`);
+        }
       } else {
         inCodeBlock = false;
-        const borderLength = Math.max(5, Math.min(30, width - 4));
-        wrappedLines.push(`${colors.dim}└───${'─'.repeat(borderLength)}${reset}`);
       }
       continue;
     }
@@ -233,18 +365,28 @@ export function outputFormatted(text, overrideWidth) {
     if (headerMatch) {
       const level = headerMatch[1].length;
       const title = headerMatch[2];
-      const symbol = level === 1 ? '◆' : level === 2 ? '◇' : '◈';
-      const wrapWidth = Math.max(10, width - 2); // 2 is symbol + space
-      const wrappedTitle = wrapString(title, wrapWidth);
-      const baseColor = colors.header;
 
-      if (wrappedTitle.length > 0) {
-        const formattedFirst = applyInlineStyles(wrappedTitle[0]).replace(/\x1b\[39m/g, `\x1b[39m${baseColor}`);
-        wrappedLines.push(`${colors.header}${symbol} ${baseColor}${formattedFirst}${reset}`);
-        for (let i = 1; i < wrappedTitle.length; i++) {
-          const formattedSub = applyInlineStyles(wrappedTitle[i]).replace(/\x1b\[39m/g, `\x1b[39m${baseColor}`);
-          wrappedLines.push(`  ${baseColor}${formattedSub}${reset}`);
-        }
+      // Color hierarchy: H1 = header (purple), H2 = main (blue), H3+ = dim
+      const levelColor = level === 1 ? colors.header
+                       : level === 2 ? colors.main
+                       : colors.dim;
+
+      // Bold for H1 and H2, normal for H3+
+      const boldStart = level <= 2 ? '\x1b[1m' : '';
+      const boldEnd   = level <= 2 ? '\x1b[22m' : '';
+
+      // Add a blank line before headers for breathing room
+      if (wrappedLines.length > 0 && wrappedLines[wrappedLines.length - 1] !== '') {
+        wrappedLines.push('');
+      }
+
+      const wrapWidth = Math.max(10, width);
+      const wrappedTitle = wrapString(title, wrapWidth);
+
+      for (const segment of wrappedTitle) {
+        const formatted = applyInlineStyles(segment)
+                            .replace(/\x1b\[39m/g, `\x1b[39m${levelColor}`);
+        wrappedLines.push(`${boldStart}${levelColor}${formatted}${boldEnd}${reset}`);
       }
       continue;
     }
@@ -263,8 +405,7 @@ export function outputFormatted(text, overrideWidth) {
       let formattedPrefix = prefix;
       const bulletMatch = prefix.match(/^(\s*)([-*+])(\s)/);
       if (bulletMatch) {
-        const bulletSymbol = bulletMatch[2] === '-' ? '•' : bulletMatch[2] === '*' ? '◦' : '▪';
-        formattedPrefix = `${bulletMatch[1]}${colors.main}${bulletSymbol}${reset}${bulletMatch[3]}`;
+        formattedPrefix = `${bulletMatch[1]}${colors.main}•${reset}${bulletMatch[3]}`;
       } else {
         const numberMatch = prefix.match(/^(\s*)(\d+(\.\d+)*\.)(\s)/);
         if (numberMatch) {
@@ -284,6 +425,10 @@ export function outputFormatted(text, overrideWidth) {
     // 6. Check for Blockquote structure
     const quoteMatch = line.match(/^(\s*)(>\s?)/);
     if (quoteMatch) {
+      // Add spacing before blockquotes for breathing room
+      if (wrappedLines.length > 0 && wrappedLines[wrappedLines.length - 1] !== '') {
+        wrappedLines.push('');
+      }
       const prefix = quoteMatch[0];
       const content = line.substring(prefix.length);
       const wrapWidth = Math.max(10, width - prefix.length);
@@ -328,5 +473,12 @@ export function outputFormatted(text, overrideWidth) {
     }
   }
 
-  return wrappedLines.join('\n');
+  // Flush any table that ends at end-of-input
+  if (tableBuffer.length > 0) {
+    renderTable(tableBuffer);
+  }
+
+  return wrappedLines
+    .map(line => line.replace(/[\s\u200B]+(?=(?:\x1b\[[0-9;]*[a-zA-Z]|\s)*$)/g, ''))
+    .join('\n');
 }

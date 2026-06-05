@@ -54,7 +54,7 @@ cwk "Explain the data flow in the engine/ models"
 ## ✨ Features that Matter
 
 - **Zero-Whitespace UI**: High-density terminal output designed for professionals. No fluff, just clean, ansi-balanced structured layouts.
-- **Rich Terminal Markdown Rendering**: Custom lightweight layout engine supporting responsive headers, bullets, blockquotes, code blocks with clean borders, and subtle horizontal rules, with full CJK visual character column matching.
+- **Rich Terminal Markdown Rendering**: Custom lightweight layout engine supporting responsive headers, bullets, blockquotes, code blocks with clean borders, horizontal rules, and tables, with full CJK visual character column matching.
 - **Interactive Feedback**: The AI can request clarifications via the `askUser` tool or trigger an interactive `[ Yes ]  No` toggle using `askConfirm`.
 - **Smart Discovery**: Built-in `searchText`, `findFile`, and `projectTree` tools that respect your `.gitignore`.
 - **Web Research**: Dynamically search the web (`webSearch`) and read documentation (`webFetch`) directly from the CLI.
