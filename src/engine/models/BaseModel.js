@@ -249,10 +249,10 @@ export default class BaseModel {
           webSearch: 'searching web',
           findFile: 'finding',
           findDir: 'finding',
-          listTools: 'listing',
           gitDiff: 'git diff',
           gitLog: 'git log',
           gitStatus: 'git status',
+          readManyFiles: 'loading files',
         };
 
         const label = toolLabels[name] || name;

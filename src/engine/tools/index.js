@@ -5,7 +5,6 @@ import readFileChunk from './readFileChunk.js';
 import searchText from './searchText.js';
 import webFetch from './webFetch.js';
 import webSearch from './webSearch.js';
-import listTools from './listTools.js';
 import findFile from './findFile.js';
 import findDir from './findDir.js';
 import askUser from './askUser.js';
@@ -13,6 +12,8 @@ import askConfirm from './askConfirm.js';
 import gitDiff from './gitDiff.js';
 import gitLog from './gitLog.js';
 import gitStatus from './gitStatus.js';
+import readManyFiles from './readManyFiles.js';
+
 
 export const toolDefinitions = [
   {
@@ -122,18 +123,6 @@ export const toolDefinitions = [
   {
     type: "function",
     function: {
-      name: "listTools",
-      description: "List all available tools and usage guidelines.",
-      parameters: {
-        type: "object",
-        properties: {},
-        required: []
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
       name: "findFile",
       description: "Find files by name using regex. Supports recursion and .gitignore.",
       parameters: {
@@ -235,6 +224,37 @@ export const toolDefinitions = [
         required: []
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "readManyFiles",
+      description: "Read and concatenate contents of multiple files matching glob patterns. Respects gitignores and ignores binary files unless explicitly requested.",
+      parameters: {
+        type: "object",
+        properties: {
+          include: {
+            type: "array",
+            items: { "type": "string" },
+            description: "Glob patterns of files to include (e.g. ['src/**/*.js', 'config/*.json'])."
+          },
+          exclude: {
+            type: "array",
+            items: { "type": "string" },
+            description: "Optional. Glob patterns of files to exclude."
+          },
+          useDefaultExcludes: {
+            type: "boolean",
+            "description": "Whether to use default exclusions (node_modules, .git, etc.). Default: true."
+          },
+          respectGitIgnore: {
+            type: "boolean",
+            "description": "Whether to respect .gitignore patterns. Default: true."
+          }
+        },
+        required: ["include"]
+      }
+    }
   }
 ];
 
@@ -246,7 +266,6 @@ const toolImplementations = {
   searchText,
   webFetch,
   webSearch,
-  listTools,
   findFile,
   findDir,
   askUser,
@@ -254,6 +273,7 @@ const toolImplementations = {
   gitDiff,
   gitLog,
   gitStatus,
+  readManyFiles,
 };
 
 /**

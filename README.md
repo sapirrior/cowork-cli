@@ -56,9 +56,9 @@ cwk "Explain the data flow in the engine/ models"
 - **Zero-Whitespace UI**: High-density terminal output designed for professionals. No fluff, just clean, ansi-balanced structured layouts.
 - **Rich Terminal Markdown Rendering**: Custom lightweight layout engine supporting responsive headers, bullets, blockquotes, code blocks with clean borders, horizontal rules, and tables, with full CJK visual character column matching.
 - **Interactive Feedback**: The AI can request clarifications via the `askUser` tool or trigger an interactive `[ Yes ]  No` toggle using `askConfirm`.
-- **Smart Discovery**: Built-in `searchText`, `findFile`, and `projectTree` tools that respect your `.gitignore`.
+- **Smart Discovery**: Built-in `searchText`, `findFile`, `readManyFiles`, and `projectTree` tools that respect your `.gitignore`.
 - **Web Research**: Dynamically search the web (`webSearch`) and read documentation (`webFetch`) directly from the CLI.
-- **Surgical I/O**: Read entire files or specific line ranges (`readFileChunk`) with automatic binary detection.
+- **Surgical I/O**: Read entire files, load multiple files via glob matching (`readManyFiles`), or inspect specific line ranges (`readFileChunk`) with automatic binary detection.
 - **Piping Support**: Pipe logs or diffs directly into `cwk` for instant analysis.
 
 ## 📦 Installation
