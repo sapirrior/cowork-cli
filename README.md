@@ -15,17 +15,22 @@ Love Google's Gemini models? We do too. `cwk` features a specialized handler to 
 
 ---
 
-## 🛠️ Rapid Setup (OpenRouter Example)
+## 🛠️ Rapid Setup
 
-Get up and running in seconds. Just point `cwk` to your provider in your `~/.env` file:
+Get up and running in seconds. Just run `cwk --login` (or `cwk -l`) to configure your chosen provider interactively:
 
-```env
-# Example using OpenRouter to access Gemini 3.1 Pro
-CWK_MODEL_NAME=google/gemini-3.1-pro
-CWK_MODEL_URL=https://openrouter.ai/api/v1
-CWK_MODEL_API_KEY=your_openrouter_key
-CWK_MODEL_TYPE=openai
+```bash
+# Start the interactive configuration wizard
+cwk --login
+
+# Or bypass the selector and configure a specific provider directly
+cwk --login google
+cwk --login openai
+cwk --login openrouter
+cwk --login local
 ```
+
+All credentials are saved securely in your home directory under `~/.config/cowork/auth.json`. Running `cwk --login <provider>` on an already configured provider switches active models instantly without prompting you for details again.
 
 ---
 
@@ -85,10 +90,10 @@ npm install -g cowork-cli
 | Command | Description |
 | :--- | :--- |
 | `cwk "query"` | Run a one-shot analysis on your codebase. |
+| `cwk -l`, `--login [provider]` | Configure or switch AI providers (google, openai, openrouter, local). |
 | `cwk -v`, `--version` | Display the current version of `cwk`. |
-| `cwk --help` | Show the minimalist help menu. |
+| `cwk -h`, `--help` | Show the minimalist help menu. |
 
 ---
 
 *“cwk... how does this work again?”*
-

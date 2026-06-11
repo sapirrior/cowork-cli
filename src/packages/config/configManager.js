@@ -5,12 +5,33 @@ import dotenv from 'dotenv';
 import { logger } from '../utils/index.js';
 
 const CONFIG_PATH = path.join(os.homedir(), '.env');
+const AUTH_JSON_PATH = path.join(os.homedir(), '.config', 'cowork', 'auth.json');
 
 /**
- * Loads the user configuration from ~/.env file.
+ * Loads the user configuration from ~/.config/cowork/auth.json (or fallback ~/.env).
  * @returns {Object|null} The configuration object or null if it doesn't exist or is invalid.
  */
 export const loadConfig = () => {
+  // 1. Try reading the modern auth.json multi-provider configuration
+  try {
+    if (fs.existsSync(AUTH_JSON_PATH)) {
+      const content = fs.readFileSync(AUTH_JSON_PATH, 'utf8');
+      const authConfig = JSON.parse(content);
+      if (authConfig && authConfig.active && authConfig.providers && authConfig.providers[authConfig.active]) {
+        const activeConfig = authConfig.providers[authConfig.active];
+        return {
+          model_name: activeConfig.model_name,
+          model_url: activeConfig.model_url,
+          model_api_key: activeConfig.model_api_key,
+          model_type: activeConfig.model_type
+        };
+      }
+    }
+  } catch (err) {
+    logger.error(`Error loading configuration from ~/.config/cowork/auth.json: ${err.message}`);
+  }
+
+  // 2. Fall back to the legacy ~/.env file
   try {
     if (fs.existsSync(CONFIG_PATH)) {
       const content = fs.readFileSync(CONFIG_PATH, 'utf8');

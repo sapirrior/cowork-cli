@@ -3,20 +3,19 @@ import { formatMain, formatSecondary, formatNormal } from './logger.js';
 const helpMsg = `${formatMain('cwk - Ask AI from your terminal')}
 
 ${formatSecondary('Usage:')}
-  ${formatNormal('cwk "<query>"         Ask a question to your configured AI model.')}
-  ${formatNormal('cwk -v, --version     Show version information.')}
-  ${formatNormal('cwk -h, --help        Show this help message.')}
+  ${formatNormal('cwk "<query>"                 Ask a question to your active AI model.')}
+  ${formatNormal('cwk -l, --login [provider]    Configure or switch active provider (google, openai, openrouter, local).')}
+  ${formatNormal('cwk -v, --version             Show version information.')}
+  ${formatNormal('cwk -h, --help                Show this help message.')}
 
 ${formatSecondary('Examples:')}
   ${formatNormal('cwk "How do I list files in Node.js?"')}
-  ${formatNormal('cwk -h')}
+  ${formatNormal('cwk --login google')}
+  ${formatNormal('cwk -l')}
 
 ${formatSecondary('Configuration:')}
-  ${formatNormal('Provide API settings in your ~/.env file using these keys:')}
-  ${formatNormal('  CWK_MODEL_NAME=gpt-4')}
-  ${formatNormal('  CWK_MODEL_URL=https://api.openai.com/v1')}
-  ${formatNormal('  CWK_MODEL_API_KEY=your_key_here')}
-  ${formatNormal('  CWK_MODEL_TYPE=openai')}`;
+  ${formatNormal('Settings are managed inside ~/.config/cowork/auth.json via \'cwk --login\'.')}
+  ${formatNormal('We also support legacy environment variables set in ~/.env if auth.json is absent.')}`;
 
 export default function show_help() {
   console.log(helpMsg);

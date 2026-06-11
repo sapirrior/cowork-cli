@@ -1,19 +1,27 @@
 import { show_help, logger } from "../packages/utils/index.js";
 import { clientLoader } from "../packages/providers/index.js";
 import { runQuery } from "../packages/agent/index.js";
-import { loadConfig, verifyConnectivity } from "../packages/config/index.js";
+import { loadConfig, verifyConnectivity, runLoginWizard } from "../packages/config/index.js";
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PKG_PATH = path.join(__dirname, '../../package.json');
+const AUTH_JSON_PATH = path.join(os.homedir(), '.config', 'cowork', 'auth.json');
 
 /**
  * Main entry point for the cwk CLI.
  * @param {string[]} args Command line arguments.
  */
 export default async function main(args) {
+  // Handle CLI commands first
+  if (args[0] === '--login' || args[0] === '-l') {
+    await runLoginWizard(args.slice(1));
+    return;
+  }
+
   let pipedData = '';
   if (!process.stdin.isTTY) {
     try {
@@ -40,6 +48,14 @@ export default async function main(args) {
     } catch (e) {
       logger.error("Error reading version from package.json");
     }
+    return;
+  }
+
+  // If the user attempts to pass a flag that is not recognized, do not treat it as a query prompt.
+  if (args[0] && args[0].startsWith('-')) {
+    logger.error(`Error: Unrecognized option '${args[0]}'.`);
+    show_help();
+    process.exitCode = 1;
     return;
   }
 

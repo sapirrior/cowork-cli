@@ -1,5 +1,5 @@
-import { ui } from './src/packages/tui/index.js';
-import { formatMain, formatHeader, formatSecondary, formatDim, formatError, logger } from './src/packages/utils/index.js';
+import { ui } from '../tui/index.js';
+import { formatMain, formatHeader, formatSecondary, formatDim, formatError, logger } from '../utils/index.js';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -35,9 +35,9 @@ function saveAuthFile(authConfig) {
       fs.mkdirSync(configDir, { recursive: true });
     }
     fs.writeFileSync(authPath, JSON.stringify(authConfig, null, 2), 'utf8');
-    console.log(formatMain(`Successfully updated configuration at ${authPath}`));
+    logger.main(`Successfully updated configuration at ${authPath}`);
   } catch (err) {
-    console.log(formatError(`Failed to save auth configuration: ${err.message}`));
+    logger.error(`Failed to save auth configuration: ${err.message}`);
   }
 }
 
@@ -137,7 +137,11 @@ function normalizeProviderKey(input) {
   return clean;
 }
 
-async function runTest(args = []) {
+/**
+ * Executable login wizard command.
+ * @param {string[]} args CLI arguments.
+ */
+export async function runLoginWizard(args = []) {
   const providersMap = {
     'google': { name: 'Google Gemini', defaultModel: 'gemini-1.5-flash', url: 'https://generativelanguage.googleapis.com/v1beta/openai', type: 'gemini' },
     'openai': { name: 'OpenAI', defaultModel: 'gpt-4o-mini', url: 'https://api.openai.com/v1', type: 'openai' },
@@ -157,7 +161,7 @@ async function runTest(args = []) {
       if (providersMap[normalizedKey]) {
         selectedProviderName = providersMap[normalizedKey].name;
       } else {
-        console.log(formatError(`Unknown provider arg: '${args[0]}'. Opening selector.`));
+        logger.error(`Unknown provider: '${args[0]}'. Opening selector.`);
         selectedProviderName = await selectProvider(providersList);
       }
     } else {
@@ -166,6 +170,14 @@ async function runTest(args = []) {
 
     const providerKey = normalizeProviderKey(selectedProviderName);
     const providerMeta = providersMap[providerKey];
+
+    // If already configured, switch active provider directly and exit cleanly without prompts
+    if (authConfig.providers && authConfig.providers[providerKey]) {
+      authConfig.active = providerKey;
+      saveAuthFile(authConfig);
+      logger.main(`Active provider switched to: ${providerMeta.name}`);
+      return;
+    }
 
     let currentConfig = {
       model_type: providerMeta.type,
@@ -177,7 +189,6 @@ async function runTest(args = []) {
     console.log(formatHeader(`Configuring ${providerMeta.name}...`));
 
     if (providerKey === 'local') {
-      // Local setup logic:
       currentConfig.model_url = await ui.ask('Enter your Local Endpoint URL (mandatory)');
       while (!currentConfig.model_url.trim()) {
         console.log(formatError('Endpoint URL is mandatory for Local setups.'));
@@ -186,7 +197,6 @@ async function runTest(args = []) {
       currentConfig.model_name = await askOptional('Enter local model name', providerMeta.defaultModel);
       currentConfig.model_api_key = await askOptional('Enter local API Key (optional)', 'sk-no-key-required');
     } else {
-      // Non-Local Setup: Must ask for model name and API Key
       currentConfig.model_name = await askOptional(`Enter ${providerMeta.name} Model Name`, providerMeta.defaultModel);
       currentConfig.model_api_key = await ui.ask(`Enter your ${providerMeta.name} API Key`);
       while (!currentConfig.model_api_key.trim()) {
@@ -195,23 +205,15 @@ async function runTest(args = []) {
       }
     }
 
-    // Update config structure
     authConfig.providers[providerKey] = currentConfig;
     authConfig.active = providerKey;
 
     saveAuthFile(authConfig);
-
-    console.log(formatMain('\n--- Saved Configuration ---'));
-    console.log(JSON.stringify(authConfig, null, 2));
-    console.log(formatMain('---------------------------\n'));
-
   } catch (err) {
-    if (err.cancelled) {
-      console.log('Selection aborted cleanly.');
+    if (err && err.cancelled) {
+      console.log(formatDim('Selection aborted cleanly.'));
     } else {
-      console.error('Error during selection test:', err);
+      logger.error('Error during setup: ' + err.message);
     }
   }
 }
-
-runTest(process.argv.slice(2));
