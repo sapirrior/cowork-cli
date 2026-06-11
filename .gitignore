@@ -5,3 +5,4 @@ src/packages/config/configs/user.json
 tmp/
 .antigravitycli/
 test.js
+package-lock.json
