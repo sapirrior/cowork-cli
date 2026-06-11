@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import dotenv from 'dotenv';
-import { logger } from './logger.js';
+import { logger } from '../utils/index.js';
 
 const CONFIG_PATH = path.join(os.homedir(), '.env');
 

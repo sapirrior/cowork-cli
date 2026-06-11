@@ -1,4 +1,4 @@
-import { ui } from '../../utils/ui.js';
+import { ui } from '../../tui/index.js';
 
 /**
  * askConfirm tool — asks the user a yes/no question via the terminal.

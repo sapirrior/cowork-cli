@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const configPath = path.join(__dirname, '../configs/config.json');
+const configPath = path.join(__dirname, '../config/configs/config.json');
 
 let config;
 try {

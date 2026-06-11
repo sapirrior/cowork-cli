@@ -1,5 +1,5 @@
 import fs from 'fs/promises';
-import { getIgnorePatterns, isSafeEntry, safePath } from '../../utils/fsUtils.js';
+import { getIgnorePatterns, isSafeEntry, safePath } from '../../utils/index.js';
 
 /**
  * Implementation of the readDir tool.

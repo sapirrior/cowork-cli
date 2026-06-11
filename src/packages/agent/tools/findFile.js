@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { getIgnorePatterns, isSafeEntry, loadNestedIgnores, safePath } from '../../utils/fsUtils.js';
+import { getIgnorePatterns, isSafeEntry, loadNestedIgnores, safePath } from '../../utils/index.js';
 
 /**
  * findFile tool: Finds files by name using regex.

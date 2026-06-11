@@ -1,9 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { logger } from '../utils/logger.js';
-import DefaultModel from './models/default.js';
-import GeminiModel from './models/gemini.js';
+import { logger } from '../utils/index.js';
+import { DefaultModel, GeminiModel } from '../providers/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -23,7 +22,7 @@ export default async function runQuery(client, config, query) {
     // 1. Load and format system prompt from internal sys.txt
     let systemPrompt = null;
     try {
-      const promptPath = path.join(__dirname, '../configs/sys.txt');
+      const promptPath = path.join(__dirname, '../config/configs/sys.txt');
       if (fs.existsSync(promptPath)) {
         systemPrompt = fs.readFileSync(promptPath, 'utf8')
           .replace('${folder}', process.cwd())

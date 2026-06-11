@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import { Buffer } from 'buffer';
-import { safePath } from '../../utils/fsUtils.js';
+import { safePath } from '../../utils/index.js';
 
 const MAX_FILE_SIZE = 1024 * 1024; // 1MB limit
 

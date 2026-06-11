@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { safePath } from '../../utils/fsUtils.js';
+import { safePath } from '../../utils/index.js';
 
 const execFileAsync = promisify(execFile);
 

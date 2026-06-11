@@ -1,14 +1,13 @@
-import show_help from "./utils/helpMsg.js";
-import clientLoader from "./engine/client.js";
-import runQuery from "./engine/run.js";
-import { loadConfig, verifyConnectivity } from "./utils/configManager.js";
-import { logger } from "./utils/logger.js";
+import { show_help, logger } from "../packages/utils/index.js";
+import { clientLoader } from "../packages/providers/index.js";
+import { runQuery } from "../packages/agent/index.js";
+import { loadConfig, verifyConnectivity } from "../packages/config/index.js";
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PKG_PATH = path.join(__dirname, '../package.json');
+const PKG_PATH = path.join(__dirname, '../../package.json');
 
 /**
  * Main entry point for the cwk CLI.

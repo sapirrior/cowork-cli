@@ -1,6 +1,6 @@
 import { OpenAI } from 'openai';
-import { loadConfig, validateConfig } from '../utils/configManager.js';
-import { logger } from '../utils/logger.js';
+import { loadConfig, validateConfig } from '../config/index.js';
+import { logger } from '../utils/index.js';
 
 /**
  * Initializes and returns an OpenAI client instance.

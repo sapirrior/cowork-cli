@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { Buffer } from 'buffer';
-import { getIgnorePatterns, isSafeEntry, loadNestedIgnores, safePath } from '../../utils/fsUtils.js';
+import { getIgnorePatterns, isSafeEntry, loadNestedIgnores, safePath } from '../../utils/index.js';
 
 const MAX_MATCHES_PER_FILE = 20;
 const MAX_TOTAL_MATCHES = 100;

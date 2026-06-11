@@ -1,4 +1,4 @@
-import { colors } from './logger.js';
+import { colors } from '../utils/index.js';
 
 const reset = '\x1b[0m';
 

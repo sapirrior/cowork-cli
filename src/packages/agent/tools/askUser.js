@@ -1,4 +1,4 @@
-import { ui } from '../../utils/ui.js';
+import { ui } from '../../tui/index.js';
 
 /**
  * Implementation of the askUser tool.

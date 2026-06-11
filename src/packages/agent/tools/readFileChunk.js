@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import { Buffer } from 'buffer';
-import { safePath } from '../../utils/fsUtils.js';
+import { safePath } from '../../utils/index.js';
 
 /**
  * Implementation of the readFileChunk tool.

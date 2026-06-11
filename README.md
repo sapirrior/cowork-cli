@@ -67,6 +67,19 @@ cwk "Explain the data flow in the engine/ models"
 npm install -g cowork-cli
 ```
 
+## 🏗️ Project Architecture
+
+`cowork-cli` is organized into a modular package-based structure inside `src/` to separate concerns cleanly:
+
+- **`src/bin/`**: Contains `cli.js`, the executable command entry point.
+- **`src/core/`**: Orchestrates the top-level execution flow, parsing stdin, commands, and calling the agent loop.
+- **`src/packages/`**: Self-contained packages with explicit public APIs exposed via `index.js`:
+  - **`tui/`**: Manages console output styling, markdown syntax rendering, and user input prompts.
+  - **`providers/`**: Holds API clients and specialized model logic (e.g. Gemini, OpenAI, custom BaseModels).
+  - **`agent/`**: The core execution engine and the tools suite (`searchText`, `readManyFiles`, etc.).
+  - **`config/`**: Loads configuration environments (`.env`) and format system instructions.
+  - **`utils/`**: General lower-level utilities (loggers, filesystem constraints, and file ignore logic).
+
 ## ⌨️ Commands
 
 | Command | Description |
@@ -78,3 +91,4 @@ npm install -g cowork-cli
 ---
 
 *“cwk... how does this work again?”*
+

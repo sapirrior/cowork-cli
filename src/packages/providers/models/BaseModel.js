@@ -1,7 +1,6 @@
-import { toolDefinitions, dispatchTool } from '../tools/index.js';
-import { logger, formatMain, formatDim } from '../../utils/logger.js';
-import { ui } from '../../utils/ui.js';
-import { outputFormatted } from '../../utils/outputFormatter.js';
+import { toolDefinitions, dispatchTool } from '../../agent/index.js';
+import { logger, formatMain, formatDim } from '../../utils/index.js';
+import { ui, outputFormatted } from '../../tui/index.js';
 
 // Defined at module scope: avoid re-allocating on every caught error.
 // Transient Node.js-level network error codes that warrant an automatic retry.

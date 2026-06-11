@@ -6,8 +6,8 @@
  * Handles top-level error boundaries and passes execution to the main application logic.
  */
 
-import main from "../src/main.js";
-import { logger } from "../src/utils/logger.js";
+import main from "../src/core/index.js";
+import { logger } from "../src/packages/utils/index.js";
 
 // Catch unhandled promise rejections
 process.on('unhandledRejection', (reason) => {
