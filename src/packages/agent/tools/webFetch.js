@@ -133,6 +133,8 @@ export default async function webFetch({ url }) {
       }
 
       // 6. Context Awareness: Truncation
+      // NOTE: slicing by character length is an approximation of context size
+      // and does not precisely map to token usage, especially for CJK or multi-byte text.
       if (text.length > MAX_CHARS) {
         text = text.slice(0, MAX_CHARS) + "\n\n[Warning: Output truncated to fit context limits]";
       }

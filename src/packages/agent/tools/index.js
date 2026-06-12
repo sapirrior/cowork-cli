@@ -26,7 +26,8 @@ export const toolDefinitions = [
         properties: {
           filePath: { type: "string", description: "Path to the file." }
         },
-        required: ["filePath"]
+        required: ["filePath"],
+        additionalProperties: false
       }
     }
   },
@@ -40,7 +41,8 @@ export const toolDefinitions = [
         properties: {
           dirPath: { type: "string", description: "Path to the directory." }
         },
-        required: ["dirPath"]
+        required: ["dirPath"],
+        additionalProperties: false
       }
     }
   },
@@ -54,7 +56,8 @@ export const toolDefinitions = [
         properties: {
           dirPath: { type: "string", description: "The folder to act as root for the tree." }
         },
-        required: ["dirPath"]
+        required: ["dirPath"],
+        additionalProperties: false
       }
     }
   },
@@ -67,10 +70,11 @@ export const toolDefinitions = [
         type: "object",
         properties: {
           filePath: { type: "string", description: "Path to the file." },
-          startLine: { type: "number", description: "1-based start line." },
-          endLine: { type: "number", description: "1-based end line (inclusive)." }
+          startLine: { type: "integer", description: "1-based start line." },
+          endLine: { type: "integer", description: "1-based end line (inclusive)." }
         },
-        required: ["filePath", "startLine", "endLine"]
+        required: ["filePath", "startLine", "endLine"],
+        additionalProperties: false
       }
     }
   },
@@ -85,9 +89,10 @@ export const toolDefinitions = [
           pattern: { type: "string", description: "Regex or text pattern." },
           path: { type: "string", description: "File or directory to search." },
           recursive: { type: "boolean", description: "Search subdirectories? (default: false)" },
-          context: { type: "number", description: "Lines of context around each match (default: 2, max: 5)." }
+          context: { type: "integer", description: "Lines of context around each match (default: 2, max: 5)." }
         },
-        required: ["pattern", "path"]
+        required: ["pattern", "path"],
+        additionalProperties: false
       }
     }
   },
@@ -101,7 +106,8 @@ export const toolDefinitions = [
         properties: {
           url: { type: "string", description: "Full HTTP/HTTPS URL." }
         },
-        required: ["url"]
+        required: ["url"],
+        additionalProperties: false
       }
     }
   },
@@ -114,9 +120,10 @@ export const toolDefinitions = [
         type: "object",
         properties: {
           query: { type: "string", description: "The search term/query." },
-          limit: { type: "number", description: "Max results to return (default: 5, max: 20)." }
+          limit: { type: "integer", description: "Max results to return (default: 5, max: 20)." }
         },
-        required: ["query"]
+        required: ["query"],
+        additionalProperties: false
       }
     }
   },
@@ -131,9 +138,10 @@ export const toolDefinitions = [
           pattern: { type: "string", description: "Regex pattern to match filenames." },
           dirPath: { type: "string", description: "Root directory to search (default: '.')." },
           recursive: { type: "boolean", description: "Search subdirectories? (default: true)" },
-          limit: { type: "number", description: "Maximum number of results (default: 15, max: 15)." }
+          limit: { type: "integer", description: "Maximum number of results (default: 15, max: 15)." }
         },
-        required: ["pattern"]
+        required: ["pattern"],
+        additionalProperties: false
       }
     }
   },
@@ -148,9 +156,10 @@ export const toolDefinitions = [
           pattern: { type: "string", description: "Regex pattern to match directory names." },
           dirPath: { type: "string", description: "Root directory to search (default: '.')." },
           recursive: { type: "boolean", description: "Search subdirectories? (default: true)" },
-          limit: { type: "number", description: "Maximum number of results (default: 15, max: 15)." }
+          limit: { type: "integer", description: "Maximum number of results (default: 15, max: 15)." }
         },
-        required: ["pattern"]
+        required: ["pattern"],
+        additionalProperties: false
       }
     }
   },
@@ -164,7 +173,8 @@ export const toolDefinitions = [
         properties: {
           question: { type: "string", description: "The question to ask the user." }
         },
-        required: ["question"]
+        required: ["question"],
+        additionalProperties: false
       }
     }
   },
@@ -178,7 +188,8 @@ export const toolDefinitions = [
         properties: {
           question: { type: "string", description: "The yes/no question to ask the user." }
         },
-        required: ["question"]
+        required: ["question"],
+        additionalProperties: false
       }
     }
   },
@@ -192,9 +203,9 @@ export const toolDefinitions = [
         properties: {
           staged:   { type: "boolean", description: "If true, shows staged (index) changes. Default: false (unstaged)." },
           filePath: { type: "string",  description: "Limit diff to this specific file path (optional)." },
-          maxLines: { type: "number",  description: "Maximum lines of diff output to return (default: 300, max: 500)." }
+          maxLines: { type: "integer",  description: "Maximum lines of diff output to return (default: 300, max: 500)." }
         },
-        required: []
+        additionalProperties: false
       }
     }
   },
@@ -206,10 +217,10 @@ export const toolDefinitions = [
       parameters: {
         type: "object",
         properties: {
-          limit:   { type: "number",  description: "Number of commits to retrieve (default: 10, max: 50)." },
+          limit:   { type: "integer",  description: "Number of commits to retrieve (default: 10, max: 50)." },
           oneline: { type: "boolean", description: "If true, shows each commit as a compact single line. Default: false." }
         },
-        required: []
+        additionalProperties: false
       }
     }
   },
@@ -221,7 +232,7 @@ export const toolDefinitions = [
       parameters: {
         type: "object",
         properties: {},
-        required: []
+        additionalProperties: false
       }
     }
   },
@@ -235,24 +246,25 @@ export const toolDefinitions = [
         properties: {
           include: {
             type: "array",
-            items: { "type": "string" },
+            items: { type: "string" },
             description: "Glob patterns of files to include (e.g. ['src/**/*.js', 'config/*.json'])."
           },
           exclude: {
             type: "array",
-            items: { "type": "string" },
+            items: { type: "string" },
             description: "Optional. Glob patterns of files to exclude."
           },
           useDefaultExcludes: {
             type: "boolean",
-            "description": "Whether to use default exclusions (node_modules, .git, etc.). Default: true."
+            description: "Whether to use default exclusions (node_modules, .git, etc.). Default: true."
           },
           respectGitIgnore: {
             type: "boolean",
-            "description": "Whether to respect .gitignore patterns. Default: true."
+            description: "Whether to respect .gitignore patterns. Default: true."
           }
         },
-        required: ["include"]
+        required: ["include"],
+        additionalProperties: false
       }
     }
   }

@@ -84,7 +84,7 @@ function parsePorcelain(raw) {
  * gitStatus tool: Shows the working tree status grouped into staged, unstaged, and untracked sections.
  * No parameters — always operates on process.cwd().
  */
-export default async function gitStatus() {
+export default async function gitStatus(_args) {
   const result = await runGit(['status', '--porcelain']);
   if (!result.ok) return result.error;
 

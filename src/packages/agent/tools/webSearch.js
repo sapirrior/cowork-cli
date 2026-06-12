@@ -13,7 +13,9 @@ const MAX_RESULTS_HARD_LIMIT = 20;
  * @returns {Promise<string>} JSON string of search results or error message.
  */
 export default async function webSearch({ query, limit = 5 }) {
-  if (!query) return "Error: Search query cannot be empty.";
+  if (!query) {
+    return JSON.stringify({ error: "Search query cannot be empty." });
+  }
 
   const maxLimit = Math.min(Math.max(1, limit), MAX_RESULTS_HARD_LIMIT);
 
@@ -63,15 +65,15 @@ export default async function webSearch({ query, limit = 5 }) {
     }
 
     if (results.length === 0) {
-      return "No results found.";
+      return JSON.stringify({ results: [], message: "No results found." });
     }
 
     return JSON.stringify(results, null, 2);
 
   } catch (err) {
     if (err.name === 'AbortError') {
-      return `Error: Request timed out after ${TIMEOUT_MS}ms`;
+      return JSON.stringify({ error: `Request timed out after ${TIMEOUT_MS}ms` });
     }
-    return `Error searching web: ${err.message}`;
+    return JSON.stringify({ error: `Error searching web: ${err.message}` });
   }
 }

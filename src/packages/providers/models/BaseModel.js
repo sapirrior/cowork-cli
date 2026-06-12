@@ -285,7 +285,7 @@ export default class BaseModel {
         this.addMessage('tool', result, { tool_call_id: toolCall.id });
 
       } catch (err) {
-        ui.stop();
+        ui.fail();
         const errorMsg = err.message;
         logger.error(`[FAILED] ${name}: ${errorMsg}`);
         

@@ -160,7 +160,6 @@ export default async function readManyFiles({
       }
     } catch (err) {
       skippedFiles.push({ path: relativePath, reason: `Failed to open: ${err.message}` });
-      if (handle) await handle.close();
       continue;
     } finally {
       if (handle) await handle.close();
