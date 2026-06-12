@@ -10,13 +10,18 @@ function visualLength(str) {
   if (!str) return 0;
   const clean = stripAnsi(str);
   let len = 0;
-  for (let i = 0; i < clean.length; i++) {
-    const code = clean.charCodeAt(i);
-    if ((code >= 0x3000 && code <= 0x9FFF) || (code >= 0xFF00 && code <= 0xFFEF)) {
-      len += 2;
-    } else {
-      len += 1;
-    }
+  for (const char of clean) {
+    const cp = char.codePointAt(0);
+    if (cp === undefined) continue;
+    const isWide = (
+      (cp >= 0x4e00 && cp <= 0x9fff) ||
+      (cp >= 0x3400 && cp <= 0x4dbf) ||
+      (cp >= 0x3000 && cp <= 0x30ff) || // Symbols, Hiragana, Katakana
+      (cp >= 0xff00 && cp <= 0xffef) || // Fullwidth Forms
+      (cp >= 0x1f000 && cp <= 0x1faff) || // Emojis
+      (cp >= 0x20000 && cp <= 0x3ffff) // Extensions
+    );
+    len += isWide ? 2 : 1;
   }
   return len;
 }
