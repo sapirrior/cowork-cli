@@ -1,99 +1,93 @@
-# 🚀 cowork-cli (cwk)
+# 🚀 cowork-cli (`cwk`)
 
-**Stop waiting. Start knowing.**
-
-`cowork-cli` (`cwk`) is the ultimate high-speed CLI Analyst for developers who need answers, not a conversation. It's a minimalist, context-aware co-processor that lives in your terminal and understands your code as well as you do.
-
-## 🔥 Universal AI Power
-
-Think your favorite model won't work? **Think again!** `cwk` is built to be compatible with **any** (yes, ANY!) OpenAI-compatible API endpoint on the planet.
-
-Whether you're running local models via Ollama, using specialized providers, or tapping into the world's most powerful LLMs via **OpenRouter**, `cwk` has you covered.
-
-### 🌟 Full Gemini Support
-Love Google's Gemini models? We do too. `cwk` features a specialized handler to preserve the high-density analytical capabilities of the Gemini suite, ensuring you get the best out of **Gemini 3.1 Pro** and **Flash**.
+> **Stop waiting. Start knowing.**  
+> A minimalist, context-aware AI co-processor that lives in your terminal and understands your codebase.
 
 ---
 
-## 🛠️ Rapid Setup
+## ⚡ Quick Start
 
-Get up and running in seconds. Just run `cwk --login` (or `cwk -l`) to configure your chosen provider interactively:
+### 📦 Installation
+```bash
+npm install -g cowork-cli
+```
+
+### 🔑 Configuration
+Set up your AI provider interactively. `cwk` supports **any** OpenAI-compatible API (Ollama, OpenRouter, Google Gemini, OpenAI, etc.).
 
 ```bash
-# Start the interactive configuration wizard
+# Open interactive login wizard (shows setup status & active configuration)
 cwk --login
 
-# Or bypass the selector and configure a specific provider directly
+# Or directly switch to / setup a specific provider
 cwk --login google
 cwk --login openai
 cwk --login openrouter
 cwk --login local
 ```
-
-All credentials are saved securely in your home directory under `~/.config/cowork/auth.json`. Running `cwk --login <provider>` on an already configured provider switches active models instantly without prompting you for details again.
+*Credentials are saved in `~/.config/cowork/auth.json`.*
 
 ---
 
-## ⚡ Real-World Usage
+## 💡 Real-World Usage
 
-`cwk` doesn't just "chat"—it **investigates**. It uses a suite of built-in tools to map your project, search for patterns, and read files before giving you a hard-hitting, plain-text technical answer.
+Instead of open-ended chatting, `cwk` **investigates** your project using safe, built-in tools (which respect `.gitignore`).
 
-### 🔍 Explore your codebase
+### 🔍 Codebase Exploration
 ```bash
 cwk "Where is the authentication logic handled?"
 ```
-*`cwk` will automatically list directories, find relevant files, and peek at the code to give you a precise summary.*
+*`cwk` recursively traverses folders, resolves imports, and prints a precise summary.*
 
-### 🛠️ Debug like a pro
+### 🐛 Debugging & Analysis
 ```bash
-cwk "Find all 'FIXME' tags in src/ and tell me which one is most critical"
+cwk "Find all 'FIXME' tags in src/ and point out the most critical one"
 ```
 
-### 🧠 Instant Documentation
+### 🧬 Piping Inputs
 ```bash
-cwk "Explain the data flow in the engine/ models"
+git diff | cwk "Write a clean commit message for these changes"
 ```
 
 ---
 
-## ✨ Features that Matter
+## ✨ Features That Matter
 
-- **Zero-Whitespace UI**: High-density terminal output designed for professionals. No fluff, just clean, ansi-balanced structured layouts.
-- **Rich Terminal Markdown Rendering**: Custom lightweight layout engine supporting responsive headers, bullets, blockquotes, code blocks with clean borders, horizontal rules, and tables, with full CJK visual character column matching.
-- **Interactive Feedback**: The AI can request clarifications via the `askUser` tool or trigger an interactive `[ Yes ]  No` toggle using `askConfirm`.
-- **Smart Discovery**: Built-in `searchText`, `findFile`, `readManyFiles`, and `projectTree` tools that respect your `.gitignore`.
-- **Web Research**: Dynamically search the web (`webSearch`) and read documentation (`webFetch`) directly from the CLI.
-- **Surgical I/O**: Read entire files, load multiple files via glob matching (`readManyFiles`), or inspect specific line ranges (`readFileChunk`) with automatic binary detection.
-- **Piping Support**: Pipe logs or diffs directly into `cwk` for instant analysis.
+* **🔌 Universal Compatibility**: Seamless support for OpenAI, local models (Ollama/Llama), OpenRouter, and dedicated handlers for **Google Gemini** (preserving thought metadata).
+* **🖥️ Zero-Whitespace UI**: Clean, high-density terminal layouts designed for developers.
+* **🎨 Markdown Rendering**: Custom TUI compiler rendering headings, lists, tables, bold styling, and blockquotes with full CJK character width support.
+* **🔧 Powerful Tool Suite**:
+  * `searchText` (Regex searches with context window lines)
+  * `readManyFiles` (Consolidated matching file reader)
+  * `projectTree` (Visual directory structure overview)
+  * `webSearch` & `webFetch` (Browse the web / read live docs inline)
+* **🛡️ Sandboxed I/O**: Safe path validation preventing directory traversal attacks.
 
-## 📦 Installation
-
-```bash
-npm install -g cowork-cli
-```
+---
 
 ## 🏗️ Project Architecture
 
-`cowork-cli` is organized into a modular package-based structure inside `src/` to separate concerns cleanly:
+The codebase is split into modular packages under `src/packages/`:
 
-- **`src/bin/`**: Contains `cli.js`, the executable command entry point.
-- **`src/core/`**: Orchestrates the top-level execution flow, parsing stdin, commands, and calling the agent loop.
-- **`src/packages/`**: Self-contained packages with explicit public APIs exposed via `index.js`:
-  - **`tui/`**: Manages console output styling, markdown syntax rendering, and user input prompts.
-  - **`providers/`**: Holds API clients and specialized model logic (e.g. Gemini, OpenAI, custom BaseModels).
-  - **`agent/`**: The core execution engine and the tools suite (`searchText`, `readManyFiles`, etc.).
-  - **`config/`**: Loads configuration environments (`.env`) and format system instructions.
-  - **`utils/`**: General lower-level utilities (loggers, filesystem constraints, and file ignore logic).
-
-## ⌨️ Commands
-
-| Command | Description |
-| :--- | :--- |
-| `cwk "query"` | Run a one-shot analysis on your codebase. |
-| `cwk -l`, `--login [provider]` | Configure or switch AI providers (google, openai, openrouter, local). |
-| `cwk -v`, `--version` | Display the current version of `cwk`. |
-| `cwk -h`, `--help` | Show the minimalist help menu. |
+```
+src/
+├── bin/          # CLI executable entrypoint (cli.js)
+├── core/         # CLI argument and stdin pipelines (index.js)
+└── packages/     # Isolated packages with clean public APIs:
+    ├── 🤖 agent/     # Agent loops & tool execution (searchText, readManyFiles, etc.)
+    ├── ⚙️ config/    # Configuration manager and login wizard prompts
+    ├── 🔌 providers/ # LLM integration handlers (BaseModel, GeminiModel, client)
+    ├── 🎨 tui/       # Console rendering engine, custom layout component loops
+    └── 🛠️ utils/     # Ignore file parsers, logging colors, and path safety
+```
 
 ---
 
-*“cwk... how does this work again?”*
+## ⌨️ CLI Command Reference
+
+| Command | Action |
+| :--- | :--- |
+| `cwk "<query>"` | Run a one-shot analysis on your codebase. |
+| `cwk -l`, `--login [provider]` | Interactive setup or active provider switch (`google`, `openai`, `openrouter`, `local`). |
+| `cwk -v`, `--version` | Print the active version. |
+| `cwk -h`, `--help` | Show usage options. |
