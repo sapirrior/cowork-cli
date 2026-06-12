@@ -1,4 +1,4 @@
-import { colors } from '../utils/index.js';
+import { colors } from '../../utils/index.js';
 
 const reset = '\x1b[0m';
 
