@@ -35,7 +35,7 @@ Manages model response streams, automatic backoff, and parallel tool dispatch.
   - `handleResponse(message)`: Invoked after each turn. Appends the message to history. Can be overridden by subclasses.
   - `_getCompletion()`: Calls the OpenAI SDK completion API. Wraps executions in a retry handler.
   - `_getCompletionWithRetry(...)`: Coordinates linear backoff sleep periods (starts at 1s, scales linearly up to `MAX_BACKOFF_MS`) for connection failures.
-  - `_processToolCalls(toolCalls)`: Executes a set of tool calls in parallel using `Promise.all`. Updates progress indicator components via TUI packages, and reports execution logs to the console.
+  - `_processToolCalls(toolCalls)`: Executes non-interactive tool calls in parallel using `Promise.all` while executing interactive tool calls (`askUser`, `askConfirm`) sequentially to avoid terminal input collisions. Updates progress indicator components via TUI packages, and reports execution logs to the console.
 
 #### `default.js` (`DefaultModel`)
 Inherits direct capabilities from `BaseModel`. Intended for standard OpenAI compatibility.
