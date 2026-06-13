@@ -12,6 +12,7 @@ This package provides a lightweight, reactive terminal UI framework to render li
 | :--- | :--- | :--- | :--- |
 | `index.js` | `ui` | Export | Instantiated singleton `UIEngine` from `ui/main.js`. |
 | | `outputFormatted` | Export | Markdown-to-ANSI formatter from `ui/outputFormatter.js`. |
+| | `loginForm` | Export | High-level interactive form controller module from `ui/loginForm.js`. |
 | `test.js` | None | Script | Test/validation script for exercising UI elements. |
 
 ---
@@ -35,6 +36,12 @@ Holds the controller code split from the previous monolithic UI module.
   Interactive prompt loop routines.
   - `ask(uiInstance, question)`: Renders input components with inline text. Listens for character strokes, backspace `\x7f`, and Carriage Return keys. Resolves text strings, or rejects on Ctrl+C cancels.
   - `confirm(uiInstance, question)`: Arrow-key toggle prompt. Displays styled selection lines for Yes/No options.
+
+* #### `loginForm.js`
+  High-level interactive form controllers for the setup and login system.
+  - `selectProvider(uiInstance, items)`: Arrow-key selectable list menu.
+  - `inputField(uiInstance, options)`: Horizontal bordered user-input prompt.
+  - `runFieldSequence(uiInstance, fields)`: Sequences multiple credential fields.
 
 * #### `spinner.js`
   Helper functions for rendering active progress animations.
@@ -69,3 +76,5 @@ A lightweight component frame loop implementation.
   - `Spinner.js`: Renders live text loaders and frames for rotating characters.
   - `SelectionList.js`: Highlights selected items in arrow-key selections.
   - `PromptInput.js`: Tracks keystrokes for active prompt buffers.
+  - `InputBox.js`: Full-width horizontal bordered layout for in-line text input and error messages (supports cursor navigation, in-place editing, and wrapping).
+  - `ProviderSelector.js`: Non-boxed list selection menu showing ticks, active status, and custom highlights.

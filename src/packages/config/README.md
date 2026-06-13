@@ -18,8 +18,8 @@ This package is responsible for reading and validating credentials/model setups 
 | | `validateConfig(config)` | Function | Verifies that all required fields (`model_name`, `model_url`, `model_api_key`, `model_type`) are present and that the type is one of the supported provider clients (`openai`, `gemini`). |
 | | `verifyConnectivity(client)` | Function | Asynchronous connection test. Performs a dummy model list request (`client.models.list()`) to test endpoint health and API key validity. |
 | `loginWizard.js` | `runLoginWizard(args)` | Function | Core entry point for `cwk --login [provider]` CLI command flows. Handles: <br>1. Flat list printing on invalid providers. <br>2. Switching active providers cleanly if credentials exist. <br>3. Launching the credential setup wizard form if not configured. <br>4. Interactive selector fallback when no args are passed. |
-| | `selectProvider(authConfig)` | Function | Interactive keyboard-controlled CLI selector. Draws ticks `✓` for configured providers and labels the active provider as `(active)`. Supports arrow keys, Tab, Space, Enter, and Ctrl+C cancels. |
-| | `runCredentialForm(...)` | Function | Form workflow for credentials input. Supports pre-filling existing configuration values for convenience and preservation of keys when the field is submitted blank. |
+| | `selectProvider(authConfig)` | Function | Maps provider configurations and delegates selector rendering to the TUI `loginForm.selectProvider` component. |
+| | `runCredentialForm(...)` | Function | Form workflow for credentials input. Delegates user prompts and text wrapping to `loginForm.inputField`, supporting pre-fills and required field checks. |
 | | `loadAuthFile()` | Function | Reads `~/.config/cowork/auth.json` into memory. |
 | | `saveAuthFile(authConfig)` | Function | Writes the updated multi-provider JSON file to `~/.config/cowork/auth.json`. |
 | | `normalizeProviderKey(input)`| Function | Converts user provider string to canonical mapping (`google`, `openai`, `openrouter`, `local`). |
