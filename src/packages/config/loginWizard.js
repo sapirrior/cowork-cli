@@ -1,4 +1,4 @@
-import { ui } from '../tui/index.js';
+import { ui, loginForm } from '../tui/index.js';
 import { formatMain, formatHeader, formatSecondary, formatDim, formatError, logger } from '../utils/index.js';
 import fs from 'fs';
 import path from 'path';
@@ -127,70 +127,19 @@ async function selectProvider(authConfig) {
     throw new Error('stdin is not a TTY. Cannot select provider.');
   }
 
-  ui.header('cwk login');
-  console.log(formatSecondary('Choose your AI provider:\n'));
-
-  let selectedIdx = 0;
-
-  const labels = PROVIDER_KEYS.map(key => providerLabel(key, authConfig));
-
-  const renderList = () => {
-    for (let i = 0; i < PROVIDER_KEYS.length; i++) {
-      process.stdout.write('\r\x1b[K'); // clear line
-      const isSelected = i === selectedIdx;
-      const prefix = isSelected ? formatMain('➔ ') : '  ';
-      const item   = isSelected
-        ? formatMain(`[ ${labels[i]} ]`)
-        : formatDim(`  ${labels[i]}  `);
-      console.log(`${prefix}${item}`);
-    }
-    process.stdout.write(`\x1b[${PROVIDER_KEYS.length}A`);
-  };
-
-  process.stdout.write('\x1b[?25l');
-  renderList();
-
-  return new Promise((resolve, reject) => {
-    const onData = (data) => {
-      const str = data.toString();
-
-      if (str === '\u0003') { // Ctrl+C
-        cleanup();
-        process.stdout.write(`\x1b[${PROVIDER_KEYS.length}B`);
-        console.log(formatDim('\nLogin cancelled.'));
-        reject({ cancelled: true });
-        return;
-      }
-
-      if (str === '\r' || str === '\n') {
-        const selectedKey = PROVIDER_KEYS[selectedIdx];
-        cleanup();
-        process.stdout.write(`\x1b[${PROVIDER_KEYS.length}B`);
-        console.log(`\nSelected: ${formatMain(PROVIDERS_MAP[selectedKey].name)}\n`);
-        resolve(selectedKey);
-        return;
-      }
-
-      if (str === '\u001b[A' || str === '\u001b[D') { // Up / Left
-        selectedIdx = (selectedIdx - 1 + PROVIDER_KEYS.length) % PROVIDER_KEYS.length;
-        renderList();
-      } else if (str === '\u001b[B' || str === '\u001b[C' || str === '\t' || str === ' ') { // Down / Right / Tab / Space
-        selectedIdx = (selectedIdx + 1) % PROVIDER_KEYS.length;
-        renderList();
-      }
+  const items = PROVIDER_KEYS.map(key => {
+    const meta = PROVIDERS_MAP[key];
+    const isSetup = !!(authConfig.providers && authConfig.providers[key]);
+    const isActive = authConfig.active === key;
+    return {
+      label: meta.name,
+      configured: isSetup,
+      active: isActive
     };
-
-    const cleanup = () => {
-      if (process.stdin.isTTY) process.stdin.setRawMode(false);
-      process.stdin.off('data', onData);
-      process.stdin.pause();
-      process.stdout.write('\x1b[?25h');
-    };
-
-    if (process.stdin.isTTY) process.stdin.setRawMode(true);
-    process.stdin.resume();
-    process.stdin.on('data', onData);
   });
+
+  const selectedIdx = await loginForm.selectProvider(ui, items);
+  return PROVIDER_KEYS[selectedIdx];
 }
 
 // ─── Credential Input Form ────────────────────────────────────────────────────
@@ -202,11 +151,22 @@ async function selectProvider(authConfig) {
  * @param {string} [defaultVal] Fallback shown when no existing value exists.
  * @returns {Promise<string>}
  */
-async function askWithFallback(question, existingVal = '', defaultVal = '') {
+async function askWithFallback(label, existingVal = '', defaultVal = '', masked = false, required = false) {
   const fallback = existingVal || defaultVal;
-  const hint     = fallback ? ` [${existingVal ? 'keep existing' : `default: ${defaultVal}`}]` : '';
-  const answer   = await ui.ask(`${question}${hint}`);
-  return answer.trim() || fallback;
+  let hint = '';
+  if (existingVal) {
+    hint = '[keep existing]';
+  } else if (defaultVal) {
+    hint = `[default: ${defaultVal}]`;
+  }
+
+  return await loginForm.inputField(ui, {
+    label,
+    hint,
+    masked,
+    required,
+    fallback
+  });
 }
 
 /**
@@ -229,20 +189,12 @@ async function runCredentialForm(providerKey, authConfig) {
   };
 
   if (providerKey === 'local') {
-    config.model_url = await askWithFallback('Enter your Local Endpoint URL (mandatory)', existing.model_url, meta.url);
-    while (!config.model_url.trim()) {
-      console.log(formatError('Endpoint URL is mandatory for Local setups.'));
-      config.model_url = await askWithFallback('Enter your Local Endpoint URL (mandatory)', existing.model_url, meta.url);
-    }
-    config.model_name    = await askWithFallback('Enter local model name', existing.model_name, meta.defaultModel);
-    config.model_api_key = await askWithFallback('Enter local API Key (optional)', existing.model_api_key, 'sk-no-key-required');
+    config.model_url = await askWithFallback('Local Endpoint URL', existing.model_url, meta.url, false, true);
+    config.model_name    = await askWithFallback('Local Model Name', existing.model_name, meta.defaultModel);
+    config.model_api_key = await askWithFallback('Local API Key', existing.model_api_key, 'sk-no-key-required');
   } else {
-    config.model_name    = await askWithFallback(`Enter ${meta.name} Model Name`, existing.model_name, meta.defaultModel);
-    config.model_api_key = await askWithFallback(`Enter your ${meta.name} API Key`, existing.model_api_key);
-    while (!config.model_api_key.trim()) {
-      console.log(formatError('API Key is required.'));
-      config.model_api_key = await askWithFallback(`Enter your ${meta.name} API Key`, existing.model_api_key);
-    }
+    config.model_name    = await askWithFallback(`${meta.name} Model Name`, existing.model_name, meta.defaultModel);
+    config.model_api_key = await askWithFallback(`${meta.name} API Key`, existing.model_api_key, '', true, true);
   }
 
   authConfig.providers[providerKey] = config;

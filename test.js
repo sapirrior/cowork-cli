@@ -1,217 +1,96 @@
-import { ui } from './src/packages/tui/index.js';
-import { formatMain, formatHeader, formatSecondary, formatDim, formatError, logger } from './src/packages/utils/index.js';
-import fs from 'fs';
-import path from 'path';
-import os from 'os';
+import { ui, loginForm } from './src/packages/tui/index.js';
 
-const configDir = path.join(os.homedir(), '.config', 'cowork');
-const authPath = path.join(configDir, 'auth.json');
+const stage = process.argv[2] || '1';
 
-/**
- * Loads the current auth.json file, or returns a blank default structure.
- */
-function loadAuthFile() {
+if (stage === '1') {
+  console.log('--- Stage 1: ProviderSelector Component Smoke Test ---');
+  const items = [
+    { label: 'Google Gemini', configured: true,  active: true  },
+    { label: 'OpenAI',        configured: true,  active: false },
+    { label: 'OpenRouter',    configured: false, active: false },
+    { label: 'Local',         configured: false, active: false },
+  ];
+  
   try {
-    if (fs.existsSync(authPath)) {
-      const data = fs.readFileSync(authPath, 'utf8');
-      const parsed = JSON.parse(data);
-      if (parsed && typeof parsed === 'object') {
-        parsed.providers = parsed.providers || {};
-        return parsed;
-      }
-    }
+    const selectedIdx = await loginForm.selectProvider(ui, items);
+    console.log(`Resolved index: ${selectedIdx} (${items[selectedIdx].label})`);
   } catch (err) {
-    // Ignore and fallback
-  }
-  return { active: null, providers: {} };
-}
-
-/**
- * Writes the auth configuration back to ~/.config/cowork/auth.json
- */
-function saveAuthFile(authConfig) {
-  try {
-    if (!fs.existsSync(configDir)) {
-      fs.mkdirSync(configDir, { recursive: true });
-    }
-    fs.writeFileSync(authPath, JSON.stringify(authConfig, null, 2), 'utf8');
-    console.log(formatMain(`Successfully updated configuration at ${authPath}`));
-  } catch (err) {
-    console.log(formatError(`Failed to save auth configuration: ${err.message}`));
-  }
-}
-
-/**
- * Interactive provider selector for 'cwk login' command.
- */
-async function selectProvider(providers) {
-  if (!process.stdin.isTTY) {
-    throw new Error('stdin is not a TTY. Cannot select provider.');
-  }
-
-  ui.header('cwk login');
-  console.log(formatSecondary('Choose your AI provider:'));
-
-  let selectedIdx = 0;
-
-  const renderList = () => {
-    for (let i = 0; i < providers.length; i++) {
-      process.stdout.write('\r\x1b[K'); // clear line
-      const prefix = i === selectedIdx ? formatMain('➔ ') : '  ';
-      const item = i === selectedIdx ? formatMain(`[ ${providers[i]} ]`) : formatDim(`  ${providers[i]}  `);
-      console.log(`${prefix}${item}`);
-    }
-    process.stdout.write(`\x1b[${providers.length}A`);
-  };
-
-  process.stdout.write('\x1b[?25l');
-  renderList();
-
-  return new Promise((resolve, reject) => {
-    const onData = (data) => {
-      const str = data.toString();
-
-      if (str === '\u0003') {
-        cleanup();
-        process.stdout.write(`\x1b[${providers.length}B`);
-        console.log(formatDim('\nLogin cancelled.'));
-        reject({ cancelled: true });
-        return;
-      }
-
-      if (str === '\r' || str === '\n') {
-        cleanup();
-        process.stdout.write(`\x1b[${providers.length}B`);
-        console.log(`\nSelected Provider: ${formatMain(providers[selectedIdx])}\n`);
-        resolve(providers[selectedIdx]);
-        return;
-      }
-
-      if (str === '\u001b[A' || str === '\u001b[D') { // Up / Left
-        selectedIdx = (selectedIdx - 1 + providers.length) % providers.length;
-        renderList();
-      } else if (str === '\u001b[B' || str === '\u001b[C' || str === '\t') { // Down / Right / Tab
-        selectedIdx = (selectedIdx + 1) % providers.length;
-        renderList();
-      } else if (str === ' ') {
-        selectedIdx = (selectedIdx + 1) % providers.length;
-        renderList();
-      }
-    };
-
-    const cleanup = () => {
-      if (process.stdin.isTTY) {
-        process.stdin.setRawMode(false);
-      }
-      process.stdin.off('data', onData);
-      process.stdin.pause();
-      process.stdout.write('\x1b[?25h');
-    };
-
-    if (process.stdin.isTTY) {
-      process.stdin.setRawMode(true);
-    }
-    process.stdin.resume();
-    process.stdin.on('data', onData);
-  });
-}
-
-/**
- * Custom prompt helper to allow optional inputs.
- */
-async function askOptional(question, defaultValue = '') {
-  const qText = defaultValue ? `${question} [Default: ${defaultValue}]` : question;
-  const answer = await ui.ask(qText);
-  return answer.trim() || defaultValue;
-}
-
-/**
- * Normalizes input key to standard key mapping.
- */
-function normalizeProviderKey(input) {
-  const clean = input.toLowerCase().trim();
-  if (clean.includes('google') || clean.includes('gemini')) return 'google';
-  if (clean.includes('openai')) return 'openai';
-  if (clean.includes('openrouter')) return 'openrouter';
-  if (clean.includes('local')) return 'local';
-  return clean;
-}
-
-async function runTest(args = []) {
-  const providersMap = {
-    'google': { name: 'Google Gemini', defaultModel: 'gemini-1.5-flash', url: 'https://generativelanguage.googleapis.com/v1beta/openai', type: 'gemini' },
-    'openai': { name: 'OpenAI', defaultModel: 'gpt-4o-mini', url: 'https://api.openai.com/v1', type: 'openai' },
-    'openrouter': { name: 'OpenRouter', defaultModel: 'google/gemini-2.5-flash', url: 'https://openrouter.ai/api/v1', type: 'openai' },
-    'local': { name: 'Local', defaultModel: 'meta-llama/llama-3', url: '', type: 'openai' }
-  };
-
-  const providersList = ['Google Gemini', 'OpenAI', 'OpenRouter', 'Local'];
-  const authConfig = loadAuthFile();
-
-  try {
-    let selectedProviderName;
-    const passedArg = args[0] ? args[0].toLowerCase() : null;
-
-    if (passedArg) {
-      const normalizedKey = normalizeProviderKey(passedArg);
-      if (providersMap[normalizedKey]) {
-        selectedProviderName = providersMap[normalizedKey].name;
-      } else {
-        console.log(formatError(`Unknown provider arg: '${args[0]}'. Opening selector.`));
-        selectedProviderName = await selectProvider(providersList);
-      }
+    if (err && err.cancelled) {
+      console.log('Cancelled.');
     } else {
-      selectedProviderName = await selectProvider(providersList);
+      console.error('Error:', err);
     }
+  }
+} else if (stage === '2') {
+  console.log('--- Stage 2: FieldInput Component Smoke Test ---');
+  
+  try {
+    console.log('\nSub-test A: Plain field (Model Name) with fallback');
+    const model = await loginForm.inputField(ui, {
+      label: 'Model Name',
+      hint: '[default: gemini-1.5-flash]',
+      fallback: 'gemini-1.5-flash'
+    });
+    console.log(`Resolved: "${model}"`);
 
-    const providerKey = normalizeProviderKey(selectedProviderName);
-    const providerMeta = providersMap[providerKey];
+    console.log('\nSub-test B: Masked field (API Key)');
+    const key = await loginForm.inputField(ui, {
+      label: 'API Key',
+      masked: true
+    });
+    console.log(`Resolved: "${key}"`);
 
-    let currentConfig = {
-      model_type: providerMeta.type,
-      model_name: '',
-      model_url: providerMeta.url,
-      model_api_key: ''
-    };
-
-    console.log(formatHeader(`Configuring ${providerMeta.name}...`));
-
-    if (providerKey === 'local') {
-      // Local setup logic:
-      currentConfig.model_url = await ui.ask('Enter your Local Endpoint URL (mandatory)');
-      while (!currentConfig.model_url.trim()) {
-        console.log(formatError('Endpoint URL is mandatory for Local setups.'));
-        currentConfig.model_url = await ui.ask('Enter your Local Endpoint URL (mandatory)');
-      }
-      currentConfig.model_name = await askOptional('Enter local model name', providerMeta.defaultModel);
-      currentConfig.model_api_key = await askOptional('Enter local API Key (optional)', 'sk-no-key-required');
-    } else {
-      // Non-Local Setup: Must ask for model name and API Key
-      currentConfig.model_name = await askOptional(`Enter ${providerMeta.name} Model Name`, providerMeta.defaultModel);
-      currentConfig.model_api_key = await ui.ask(`Enter your ${providerMeta.name} API Key`);
-      while (!currentConfig.model_api_key.trim()) {
-        console.log(formatError('API Key is required.'));
-        currentConfig.model_api_key = await ui.ask(`Enter your ${providerMeta.name} API Key`);
-      }
-    }
-
-    // Update config structure
-    authConfig.providers[providerKey] = currentConfig;
-    authConfig.active = providerKey;
-
-    saveAuthFile(authConfig);
-
-    console.log(formatMain('\n--- Saved Configuration ---'));
-    console.log(JSON.stringify(authConfig, null, 2));
-    console.log(formatMain('---------------------------\n'));
+    console.log('\nSub-test C: Validation (API Key required)');
+    const reqKey = await loginForm.inputField(ui, {
+      label: 'API Key',
+      required: true
+    });
+    console.log(`Resolved: "${reqKey}"`);
 
   } catch (err) {
-    if (err.cancelled) {
-      console.log('Selection aborted cleanly.');
+    if (err && err.cancelled) {
+      console.log('Cancelled.');
     } else {
-      console.error('Error during selection test:', err);
+      console.error('Error:', err);
     }
   }
-}
+} else if (stage === '3') {
+  console.log('--- Stage 3: Full loginForm Flow Integration Test ---');
+  
+  const providers = [
+    { label: 'Google Gemini', configured: true,  active: true  },
+    { label: 'OpenAI',        configured: true,  active: false },
+    { label: 'OpenRouter',    configured: false, active: false },
+    { label: 'Local',         configured: false, active: false },
+  ];
 
-runTest(process.argv.slice(2));
+  try {
+    const selectedIdx = await loginForm.selectProvider(ui, providers);
+    const providerKey = ['google', 'openai', 'openrouter', 'local'][selectedIdx];
+    const providerLabel = providers[selectedIdx].label;
+    
+    console.log(`\nConfiguring ${providerLabel}...`);
+    
+    const fields = [
+      { key: 'model_name', label: 'Model Name', hint: '[default: gemini-1.5-flash]', fallback: 'gemini-1.5-flash' },
+      { key: 'model_api_key', label: 'API Key', masked: true, required: true }
+    ];
+    
+    const results = await loginForm.runFieldSequence(ui, fields);
+    
+    console.log('\nFinal Resolved Config:');
+    console.log(JSON.stringify({
+      provider: providerKey,
+      ...results
+    }, null, 2));
+
+  } catch (err) {
+    if (err && err.cancelled) {
+      console.log('Cancelled.');
+    } else {
+      console.error('Error:', err);
+    }
+  }
+} else {
+  console.log('Unknown stage. Please run "node test.js 1", "node test.js 2", or "node test.js 3".');
+}

@@ -25,6 +25,21 @@ function getStringWidth(str) {
 }
 
 /**
+ * Calculates the exact 0-indexed visual row where the cursor resides in the wrapping layout.
+ */
+function getVisualRowOfCursor(buffer, cursorLine, cursorColumn, termWidth) {
+  let visualRow = 0;
+  for (let i = 0; i < cursorLine; i++) {
+    const line = buffer[i] || '';
+    const visualWidth = getStringWidth(line);
+    visualRow += Math.max(1, Math.ceil(visualWidth / termWidth));
+  }
+  const colIndex = Math.max(0, cursorColumn - 1);
+  visualRow += Math.floor(colIndex / termWidth);
+  return visualRow;
+}
+
+/**
  * TerminalEngine handles inline drawing of reactive components.
  * It manages cursor movement, frame ticking, and differential updates.
  */
@@ -36,6 +51,8 @@ export default class TerminalEngine {
     this.dirty = false;
     this.active = false;
     this.cursorHidden = false;
+    this.previousCursor = null;
+    this.previousCursorLine = undefined;
 
     // Listen to terminal resizing to recalculate visual text layout columns dynamically
     process.stdout.on('resize', () => {
@@ -80,6 +97,18 @@ export default class TerminalEngine {
     } else {
       this.hideCursor();
     }
+
+    // Pre-scroll terminal for the initial render size
+    const initialLines = component.render();
+    const termWidth = process.stdout.columns || 80;
+    let visualRows = 0;
+    for (const line of initialLines) {
+      const visualWidth = getStringWidth(line);
+      visualRows += Math.max(1, Math.ceil(visualWidth / termWidth));
+    }
+    if (visualRows > 1) {
+      process.stdout.write('\n'.repeat(visualRows - 1) + `\x1b[${visualRows - 1}A\r`);
+    }
     
     this.requestFrame();
   }
@@ -101,16 +130,19 @@ export default class TerminalEngine {
       const prevVisualRows = getVisualLineCount(this.previousBuffer);
       if (prevVisualRows > 0) {
         let clearOutput = '\x1b[?2026h';
-        if (prevVisualRows > 1) {
-          const upOffset = Math.min(prevVisualRows - 1, process.stdout.rows - 1 || 24);
-          if (upOffset > 0) {
-            clearOutput += `\x1b[${upOffset}A`;
-          }
+        const prevCursorVisualRow = this.previousCursor
+          ? getVisualRowOfCursor(this.previousBuffer, this.previousCursor.line, this.previousCursor.column, termWidth)
+          : (prevVisualRows - 1);
+        const upOffset = Math.min(prevCursorVisualRow, process.stdout.rows - 1 || 24);
+        if (upOffset > 0) {
+          clearOutput += `\x1b[${upOffset}A`;
         }
         clearOutput += '\r\x1b[J\x1b[?2026l';
         process.stdout.write(clearOutput);
       }
       this.previousBuffer = [];
+      this.previousCursor = null;
+      this.previousCursorLine = undefined;
     }
   }
 
@@ -123,6 +155,8 @@ export default class TerminalEngine {
     this.components = [];
     this.dirty = false;
     this.active = false;
+    this.previousCursor = null;
+    this.previousCursorLine = undefined;
   }
 
   /**
@@ -148,14 +182,34 @@ export default class TerminalEngine {
 
     // 1. Gather next buffer lines
     const nextBuffer = [];
+    let customCursor = null;
+    let lineOffsetAccumulator = 0;
+
     for (const comp of this.components) {
-      nextBuffer.push(...comp.render());
+      const compLines = comp.render();
+      if (comp.getCursorPosition) {
+        const pos = comp.getCursorPosition();
+        if (pos) {
+          customCursor = {
+            line: lineOffsetAccumulator + pos.line,
+            column: pos.column
+          };
+        }
+      }
+      nextBuffer.push(...compLines);
+      lineOffsetAccumulator += compLines.length;
     }
 
     const termWidth = process.stdout.columns || 80;
 
+    const cursorChanged = (
+      (customCursor && (!this.previousCursor || this.previousCursor.line !== customCursor.line || this.previousCursor.column !== customCursor.column)) ||
+      (!customCursor && this.previousCursor)
+    );
+
     // Fast-path: if nothing has changed and width hasn't changed, skip drawing
-    if (termWidth === this.previousWidth &&
+    if (!cursorChanged &&
+        termWidth === this.previousWidth &&
         nextBuffer.length === this.previousBuffer.length &&
         nextBuffer.every((line, idx) => line === this.previousBuffer[idx])) {
       return;
@@ -172,14 +226,25 @@ export default class TerminalEngine {
     };
 
     const prevVisualRows = getVisualLineCount(this.previousBuffer);
+    const nextVisualRows = getVisualLineCount(nextBuffer);
 
     // Batch all ANSI movements and clears into a single write buffer string
     // Wrap drawing with \x1b[?2026h (start synchronization) and \x1b[?2026l (end synchronization) to eliminate screen flickers
     let output = '\x1b[?2026h';
 
+    // If height increased, pre-scroll terminal to prevent pushing top of component off-screen
+    if (this.previousBuffer.length > 0 && nextVisualRows > prevVisualRows) {
+      const heightIncrease = nextVisualRows - prevVisualRows;
+      output += '\n'.repeat(heightIncrease) + `\x1b[${heightIncrease}A\r`;
+    }
+
     // 2. Roll cursor back up (harden calculation to prevent scrolling terminal boundary errors)
+    const prevCursorVisualRow = this.previousCursor
+      ? getVisualRowOfCursor(this.previousBuffer, this.previousCursor.line, this.previousCursor.column, termWidth)
+      : (prevVisualRows - 1);
+
     if (prevVisualRows > 1) {
-      const upOffset = Math.min(prevVisualRows - 1, process.stdout.rows - 1 || 24);
+      const upOffset = Math.min(prevCursorVisualRow, process.stdout.rows - 1 || 24);
       if (upOffset > 0) {
         output += `\x1b[${upOffset}A`; // Move cursor up safely
       }
@@ -196,6 +261,17 @@ export default class TerminalEngine {
       }
     }
 
+    // 4. Position cursor to custom line/col if needed
+    if (customCursor) {
+      const customCursorVisualRow = getVisualRowOfCursor(nextBuffer, customCursor.line, customCursor.column, termWidth);
+      const linesFromBottom = (nextVisualRows - 1) - customCursorVisualRow;
+      if (linesFromBottom > 0) {
+        output += `\x1b[${linesFromBottom}A`;
+      }
+      const targetCol = ((customCursor.column - 1) % termWidth) + 1;
+      output += `\r\x1b[${targetCol}G`;
+    }
+
     output += '\x1b[?2026l'; // End synchronized output
 
     // Write everything to stdout in a single write operation to prevent flicker
@@ -203,5 +279,7 @@ export default class TerminalEngine {
 
     this.previousBuffer = nextBuffer;
     this.previousWidth = termWidth;
+    this.previousCursor = customCursor;
+    this.previousCursorLine = customCursor ? customCursor.line : (nextBuffer.length - 1);
   }
 }
