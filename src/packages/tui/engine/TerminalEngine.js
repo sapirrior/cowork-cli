@@ -1,27 +1,11 @@
 import readline from 'node:readline';
+import stringWidth from 'string-width';
 
 /**
  * Helper to calculate visible width of a string containing ANSI escape codes, CJK, or Emojis.
  */
 function getStringWidth(str) {
-  // Strip ANSI escape codes
-  const clean = str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
-  let width = 0;
-  for (const char of clean) {
-    const cp = char.codePointAt(0);
-    if (cp === undefined) continue;
-    // Check if character lies within CJK or Emoji wide ranges
-    const isWide = (
-      (cp >= 0x4e00 && cp <= 0x9fff) ||
-      (cp >= 0x3400 && cp <= 0x4dbf) ||
-      (cp >= 0x3000 && cp <= 0x30ff) || // Symbols, Hiragana, Katakana
-      (cp >= 0xff00 && cp <= 0xffef) || // Fullwidth Forms
-      (cp >= 0x1f000 && cp <= 0x1faff) || // Emojis
-      (cp >= 0x20000 && cp <= 0x3ffff) // Extensions
-    );
-    width += isWide ? 2 : 1;
-  }
-  return width;
+  return stringWidth(str);
 }
 
 /**
@@ -48,6 +32,7 @@ export default class TerminalEngine {
     this.components = [];
     this.previousBuffer = [];
     this.previousWidth = process.stdout.columns || 80;
+    this.previousHeight = process.stdout.rows || 24;
     this.dirty = false;
     this.active = false;
     this.cursorHidden = false;
@@ -56,6 +41,13 @@ export default class TerminalEngine {
 
     // Listen to terminal resizing to recalculate visual text layout columns dynamically
     process.stdout.on('resize', () => {
+      const w = process.stdout.columns || 80;
+      const h = process.stdout.rows || 24;
+      for (const comp of this.components) {
+        if (typeof comp.onResize === 'function') {
+          comp.onResize(w, h);
+        }
+      }
       this.requestFrame();
     });
 
@@ -98,8 +90,12 @@ export default class TerminalEngine {
       this.hideCursor();
     }
 
+    if (typeof component.onMount === 'function') {
+      component.onMount();
+    }
+
     // Pre-scroll terminal for the initial render size
-    const initialLines = component.render();
+    const initialLines = component._getLines(true);
     const termWidth = process.stdout.columns || 80;
     let visualRows = 0;
     for (const line of initialLines) {
@@ -151,6 +147,11 @@ export default class TerminalEngine {
    */
   unmountAll() {
     this.showCursor();
+    for (const comp of this.components) {
+      if (typeof comp.onUnmount === 'function') {
+        comp.onUnmount();
+      }
+    }
     this.clear();
     this.components = [];
     this.dirty = false;
@@ -177,7 +178,7 @@ export default class TerminalEngine {
   /**
    * Performs differential drawing on process.stdout
    */
-  render() {
+  render(forceAll = false) {
     this.dirty = false;
 
     // 1. Gather next buffer lines
@@ -185,8 +186,12 @@ export default class TerminalEngine {
     let customCursor = null;
     let lineOffsetAccumulator = 0;
 
+    const termWidth = process.stdout.columns || 80;
+    const termHeight = process.stdout.rows || 24;
+    const sizeChanged = termWidth !== this.previousWidth || termHeight !== this.previousHeight;
+
     for (const comp of this.components) {
-      const compLines = comp.render();
+      const compLines = comp._getLines(forceAll || sizeChanged);
       if (comp.getCursorPosition) {
         const pos = comp.getCursorPosition();
         if (pos) {
@@ -200,16 +205,15 @@ export default class TerminalEngine {
       lineOffsetAccumulator += compLines.length;
     }
 
-    const termWidth = process.stdout.columns || 80;
-
     const cursorChanged = (
       (customCursor && (!this.previousCursor || this.previousCursor.line !== customCursor.line || this.previousCursor.column !== customCursor.column)) ||
       (!customCursor && this.previousCursor)
     );
 
-    // Fast-path: if nothing has changed and width hasn't changed, skip drawing
-    if (!cursorChanged &&
-        termWidth === this.previousWidth &&
+    // Fast-path: if nothing has changed and size hasn't changed, skip drawing
+    if (!forceAll &&
+        !sizeChanged &&
+        !cursorChanged &&
         nextBuffer.length === this.previousBuffer.length &&
         nextBuffer.every((line, idx) => line === this.previousBuffer[idx])) {
       return;
@@ -244,7 +248,7 @@ export default class TerminalEngine {
       : (prevVisualRows - 1);
 
     if (prevVisualRows > 1) {
-      const upOffset = Math.min(prevCursorVisualRow, process.stdout.rows - 1 || 24);
+      const upOffset = Math.min(prevCursorVisualRow, termHeight - 1 || 24);
       if (upOffset > 0) {
         output += `\x1b[${upOffset}A`; // Move cursor up safely
       }
@@ -279,6 +283,7 @@ export default class TerminalEngine {
 
     this.previousBuffer = nextBuffer;
     this.previousWidth = termWidth;
+    this.previousHeight = termHeight;
     this.previousCursor = customCursor;
     this.previousCursorLine = customCursor ? customCursor.line : (nextBuffer.length - 1);
   }
