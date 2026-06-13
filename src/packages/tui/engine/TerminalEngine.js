@@ -114,25 +114,26 @@ export default class TerminalEngine {
    */
   clear() {
     if (this.previousBuffer.length > 0) {
-      const termWidth = process.stdout.columns || 80;
-      const getVisualLineCount = (lines) => {
+      const drawWidth = this.previousWidth || process.stdout.columns || 80;
+      const curWidth  = process.stdout.columns || 80;
+      const getVisualLineCountAt = (lines, w) => {
         let count = 0;
         for (const line of lines) {
-          const visualWidth = getStringWidth(line);
-          count += Math.max(1, Math.ceil(visualWidth / termWidth));
+          count += Math.max(1, Math.ceil(getStringWidth(line) / w));
         }
         return count;
       };
-      const prevVisualRows = getVisualLineCount(this.previousBuffer);
+      // Take the MAX across old-width and current-width so that if the terminal
+      // reflowed content into more rows we still erase all of them.
+      const prevVisualRows = Math.max(
+        getVisualLineCountAt(this.previousBuffer, drawWidth),
+        getVisualLineCountAt(this.previousBuffer, curWidth)
+      );
       if (prevVisualRows > 0) {
         let clearOutput = '\x1b[?2026h';
-        const prevCursorVisualRow = this.previousCursor
-          ? getVisualRowOfCursor(this.previousBuffer, this.previousCursor.line, this.previousCursor.column, termWidth)
-          : (prevVisualRows - 1);
-        const upOffset = Math.min(prevCursorVisualRow, process.stdout.rows - 1 || 24);
-        if (upOffset > 0) {
-          clearOutput += `\x1b[${upOffset}A`;
-        }
+        // On clear we always treat cursor as being at bottom of the frame.
+        const upOffset = Math.min(prevVisualRows - 1, process.stdout.rows - 1 || 24);
+        if (upOffset > 0) clearOutput += `\x1b[${upOffset}A`;
         clearOutput += '\r\x1b[J\x1b[?2026l';
         process.stdout.write(clearOutput);
       }
@@ -219,41 +220,57 @@ export default class TerminalEngine {
       return;
     }
 
-    // Helper to calculate wrapping lines accurately
-    const getVisualLineCount = (lines) => {
+    // Helper to calculate wrapping rows — parameterised by width so we can
+    // measure the OLD buffer at OLD width and the NEW buffer at NEW width.
+    const getVisualLineCountAt = (lines, w) => {
       let count = 0;
       for (const line of lines) {
         const visualWidth = getStringWidth(line);
-        count += Math.max(1, Math.ceil(visualWidth / termWidth));
+        count += Math.max(1, Math.ceil(visualWidth / w));
       }
       return count;
     };
 
-    const prevVisualRows = getVisualLineCount(this.previousBuffer);
-    const nextVisualRows = getVisualLineCount(nextBuffer);
+    const drawWidth = this.previousWidth || termWidth;
 
-    // Batch all ANSI movements and clears into a single write buffer string
-    // Wrap drawing with \x1b[?2026h (start synchronization) and \x1b[?2026l (end synchronization) to eliminate screen flickers
+    // On resize the terminal emulator may have *reflowed* the previously drawn
+    // content so that it occupies a different number of physical rows than what
+    // we measured at the old width.  To guarantee we erase ALL of those rows
+    // (whether the terminal narrowed and content expanded, or widened and it
+    // contracted) we take the MAX of the row count at both widths.
+    // This is the only correct fix — there is no way to query the terminal for
+    // the actual row count after a reflow.
+    const prevVisualRowsAtOldWidth = getVisualLineCountAt(this.previousBuffer, drawWidth);
+    const prevVisualRowsAtNewWidth = getVisualLineCountAt(this.previousBuffer, termWidth);
+    const prevVisualRows = sizeChanged
+      ? Math.max(prevVisualRowsAtOldWidth, prevVisualRowsAtNewWidth)
+      : prevVisualRowsAtOldWidth;
+
+    const nextVisualRows = getVisualLineCountAt(nextBuffer, termWidth);
+
+    // Batch all ANSI movements and clears into a single write buffer string.
+    // \x1b[?2026h / \x1b[?2026l = synchronized output — terminal paints atomically.
     let output = '\x1b[?2026h';
 
-    // If height increased, pre-scroll terminal to prevent pushing top of component off-screen
+    // If the new frame needs more physical rows, pre-scroll to reserve space.
     if (this.previousBuffer.length > 0 && nextVisualRows > prevVisualRows) {
       const heightIncrease = nextVisualRows - prevVisualRows;
       output += '\n'.repeat(heightIncrease) + `\x1b[${heightIncrease}A\r`;
     }
 
-    // 2. Roll cursor back up (harden calculation to prevent scrolling terminal boundary errors)
-    const prevCursorVisualRow = this.previousCursor
-      ? getVisualRowOfCursor(this.previousBuffer, this.previousCursor.line, this.previousCursor.column, termWidth)
-      : (prevVisualRows - 1);
+    // Roll cursor back up to the TOP of the previously rendered frame.
+    // On resize: always treat cursor as at the very bottom of prevVisualRows
+    // because the stored previousCursor position is stale after a reflow.
+    // On normal render: use the actual stored cursor row.
+    const prevCursorVisualRow = (sizeChanged || !this.previousCursor)
+      ? (prevVisualRows - 1)
+      : getVisualRowOfCursor(this.previousBuffer, this.previousCursor.line, this.previousCursor.column, drawWidth);
 
     if (prevVisualRows > 1) {
       const upOffset = Math.min(prevCursorVisualRow, termHeight - 1 || 24);
-      if (upOffset > 0) {
-        output += `\x1b[${upOffset}A`; // Move cursor up safely
-      }
+      if (upOffset > 0) output += `\x1b[${upOffset}A`;
     }
-    output += '\r\x1b[J'; // Clear line and all content below it to eliminate ghost rows
+    output += '\r\x1b[J'; // Erase from top of our frame downward — never touches output above
 
     // 3. Append the new buffer cleanly
     for (let i = 0; i < nextBuffer.length; i++) {
