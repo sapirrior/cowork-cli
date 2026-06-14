@@ -1,13 +1,12 @@
 {
   "name": "cowork-cli",
-  "version": "3.5.1",
+  "version": "4.0.0",
   "description": "work with cowork",
   "bin": {
-    "cwk": "bin/cli.js"
+    "cowork": "dist/bin/cli.js"
   },
   "files": [
-    "bin/",
-    "src/",
+    "dist/",
     "README.md",
     "package.json"
   ],
@@ -26,9 +25,12 @@
   "license": "MIT",
   "author": "nolan stark",
   "type": "module",
-  "main": "./src/main.js",
+  "main": "./dist/src/core/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "node $(which tsc) && cp -r src/packages/config/configs dist/src/packages/config/",
+    "start": "node dist/bin/cli.js",
+    "dev": "tsx bin/cli.js"
   },
   "dependencies": {
     "dotenv": "^17.4.2",
@@ -36,5 +38,8 @@
     "node-html-parser": "^7.1.0",
     "openai": "^6.38.0",
     "string-width": "^7.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3"
   }
 }

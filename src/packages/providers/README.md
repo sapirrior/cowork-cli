@@ -10,11 +10,11 @@ This package encapsulates interactions with the AI models, handles custom model 
 
 | File | Export / Item | Type | Description |
 | :--- | :--- | :--- | :--- |
-| `index.js` | `clientLoader` | Export | Initializes and retrieves an OpenAI client configured for the active provider. |
+| `index.ts` | `clientLoader` | Export | Initializes and retrieves an OpenAI client configured for the active provider. |
 | | `BaseModel` | Export | The base class coordinator for LLM dialog, retry, and tool-handling loop. |
 | | `DefaultModel` | Export | Handler for standard OpenAI-compatible endpoints. |
 | | `GeminiModel` | Export | Handler for Google Gemini endpoints. |
-| `client.js` | `clientLoader()` | Function | Returns a preconfigured `OpenAI` client instance. Strips trailing slashes from endpoint URLs. Disables client-side retries (`maxRetries: 0`) and sets a timeout of 60 seconds. |
+| `client.ts` | `clientLoader()` | Function | Returns a preconfigured `OpenAI` client instance. Strips trailing slashes from endpoint URLs. Disables client-side retries (`maxRetries: 0`) and sets a timeout of 60 seconds. |
 
 ---
 
@@ -22,7 +22,7 @@ This package encapsulates interactions with the AI models, handles custom model 
 
 Contains base structures and specific subclasses to abstract vendor-specific requirements.
 
-#### `BaseModel.js` (The Core Loop Handler)
+#### `BaseModel.ts` (The Core Loop Handler)
 Manages model response streams, automatic backoff, and parallel tool dispatch.
 
 * **Key Constants & Settings:**
@@ -37,10 +37,10 @@ Manages model response streams, automatic backoff, and parallel tool dispatch.
   - `_getCompletionWithRetry(...)`: Coordinates linear backoff sleep periods (starts at 1s, scales linearly up to `MAX_BACKOFF_MS`) for connection failures.
   - `_processToolCalls(toolCalls)`: Executes non-interactive tool calls in parallel using `Promise.all` while executing interactive tool calls (`askUser`, `askConfirm`) sequentially to avoid terminal input collisions. Updates progress indicator components via TUI packages, and reports execution logs to the console.
 
-#### `default.js` (`DefaultModel`)
+#### `default.ts` (`DefaultModel`)
 Inherits direct capabilities from `BaseModel`. Intended for standard OpenAI compatibility.
 
-#### `gemini.js` (`GeminiModel`)
+#### `gemini.ts` (`GeminiModel`)
 Handles integration nuances unique to Google Gemini. 
 * **Key Override:**
   - `handleResponse(message)`: Pushes the complete message payload (retaining API metadata properties such as `thought_signature`) to ensure multi-turn calls do not fail validation on subsequent context submissions.

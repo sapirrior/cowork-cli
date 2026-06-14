@@ -1,4 +1,4 @@
-# 🚀 cowork-cli (`cwk`)
+# 🚀 cowork-cli (`cowork`)
 
 > **Stop waiting. Start knowing.**  
 > A minimalist, context-aware AI co-processor that lives in your terminal and understands your codebase.
@@ -13,17 +13,17 @@ npm install -g cowork-cli
 ```
 
 ### 🔑 Configuration
-Set up your AI provider interactively. `cwk` supports **any** OpenAI-compatible API (Ollama, OpenRouter, Google Gemini, OpenAI, etc.).
+Set up your AI provider interactively. `cowork` supports **any** OpenAI-compatible API (Ollama, OpenRouter, Google Gemini, OpenAI, etc.).
 
 ```bash
 # Open interactive login wizard (shows setup status & active configuration)
-cwk --login
+cowork --login
 
 # Or directly switch to / setup a specific provider
-cwk --login google
-cwk --login openai
-cwk --login openrouter
-cwk --login local
+cowork --login google
+cowork --login openai
+cowork --login openrouter
+cowork --login local
 ```
 *Credentials are saved in `~/.config/cowork/auth.json`.*
 
@@ -31,22 +31,22 @@ cwk --login local
 
 ## 💡 Real-World Usage
 
-Instead of open-ended chatting, `cwk` **investigates** your project using safe, built-in tools (which respect `.gitignore`).
+Instead of open-ended chatting, `cowork` **investigates** your project using safe, built-in tools (which respect `.gitignore`).
 
 ### 🔍 Codebase Exploration
 ```bash
-cwk "Where is the authentication logic handled?"
+cowork "Where is the authentication logic handled?"
 ```
-*`cwk` recursively traverses folders, resolves imports, and prints a precise summary.*
+*`cowork` recursively traverses folders, resolves imports, and prints a precise summary.*
 
 ### 🐛 Debugging & Analysis
 ```bash
-cwk "Find all 'FIXME' tags in src/ and point out the most critical one"
+cowork "Find all 'FIXME' tags in src/ and point out the most critical one"
 ```
 
 ### 🧬 Piping Inputs
 ```bash
-git diff | cwk "Write a clean commit message for these changes"
+git diff | cowork "Write a clean commit message for these changes"
 ```
 
 ---
@@ -71,8 +71,8 @@ The codebase is split into modular packages under `src/packages/`:
 
 ```
 src/
-├── bin/          # CLI executable entrypoint (cli.js)
-├── core/         # CLI argument and stdin pipelines (index.js)
+├── bin/          # CLI executable entrypoint (cli.ts)
+├── core/         # CLI argument and stdin pipelines (index.ts)
 └── packages/     # Isolated packages with clean public APIs:
     ├── 🤖 agent/     # Agent loops & tool execution (searchText, readManyFiles, etc.)
     ├── ⚙️ config/    # Configuration manager and login wizard prompts
@@ -87,7 +87,7 @@ src/
 
 | Command | Action |
 | :--- | :--- |
-| `cwk "<query>"` | Run a one-shot analysis on your codebase. |
-| `cwk -l`, `--login [provider]` | Interactive setup or active provider switch (`google`, `openai`, `openrouter`, `local`). |
-| `cwk -v`, `--version` | Print the active version. |
-| `cwk -h`, `--help` | Show usage options. |
+| `cowork "<query>"` | Run a one-shot analysis on your codebase. |
+| `cowork -l`, `--login [provider]` | Interactive setup or active provider switch (`google`, `openai`, `openrouter`, `local`). |
+| `cowork -v`, `--version` | Print the active version. |
+| `cowork -h`, `--help` | Show usage options. |

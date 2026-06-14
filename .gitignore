@@ -1,5 +1,5 @@
 node_modules/
-# package-lock.json
+dist/
 src/packages/config/configs/user.json
 .env
 tmp/

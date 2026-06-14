@@ -10,14 +10,14 @@ This package is responsible for reading and validating credentials/model setups 
 
 | File | Export / Item | Type | Description |
 | :--- | :--- | :--- | :--- |
-| `index.js` | `loadConfig` | Export | Exposes config loader to obtain key, url, model name, and provider type. |
+| `index.ts` | `loadConfig` | Export | Exposes config loader to obtain key, url, model name, and provider type. |
 | | `validateConfig` | Export | Validates loaded config structure. |
 | | `verifyConnectivity` | Export | Validates credentials via active client check. |
 | | `runLoginWizard` | Export | Exposes setup wizard runner. |
-| `configManager.js` | `loadConfig()` | Function | Reads credentials. Prioritizes the JSON structure in `~/.config/cowork/auth.json` (modern multi-provider configuration). Falls back to legacy `.env` in the user's home folder. |
+| `configManager.ts` | `loadConfig()` | Function | Reads credentials. Prioritizes the JSON structure in `~/.config/cowork/auth.json` (modern multi-provider configuration). Falls back to legacy `.env` in the user's home folder. |
 | | `validateConfig(config)` | Function | Verifies that all required fields (`model_name`, `model_url`, `model_api_key`, `model_type`) are present and that the type is one of the supported provider clients (`openai`, `gemini`). |
 | | `verifyConnectivity(client)` | Function | Asynchronous connection test. Performs a dummy model list request (`client.models.list()`) to test endpoint health and API key validity. |
-| `loginWizard.js` | `runLoginWizard(args)` | Function | Core entry point for `cwk --login [provider]` CLI command flows. Handles: <br>1. Flat list printing on invalid providers. <br>2. Switching active providers cleanly if credentials exist. <br>3. Launching the credential setup wizard form if not configured. <br>4. Interactive selector fallback when no args are passed. |
+| `loginWizard.ts` | `runLoginWizard(args)` | Function | Core entry point for `cowork --login [provider]` CLI command flows. Handles: <br>1. Flat list printing on invalid providers. <br>2. Switching active providers cleanly if credentials exist. <br>3. Launching the credential setup wizard form if not configured. <br>4. Interactive selector fallback when no args are passed. |
 | | `selectProvider(authConfig)` | Function | Maps provider configurations and delegates selector rendering to the TUI `loginForm.selectProvider` component. |
 | | `runCredentialForm(...)` | Function | Form workflow for credentials input. Delegates user prompts and text wrapping to `loginForm.inputField`, supporting pre-fills and required field checks. |
 | | `loadAuthFile()` | Function | Reads `~/.config/cowork/auth.json` into memory. |
