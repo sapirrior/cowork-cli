@@ -1,4 +1,4 @@
-# A sub package named tui for cowork-cli for managing the interactive terminal interface and custom layout engine
+# A sub package named tui for haiku-67 for managing the interactive terminal interface and custom layout engine
 
 This package provides a lightweight, reactive terminal UI framework to render live spinners, handle interactive selection menus, prompt for user keyboard input, and format styled console responses.
 

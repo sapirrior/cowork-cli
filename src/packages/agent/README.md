@@ -1,4 +1,4 @@
-# A sub package named agent for cowork-cli for orchestrating LLM interactions, tool executions, and system loops
+# A sub package named agent for haiku-67 for orchestrating LLM interactions, tool executions, and system loops
 
 This package is responsible for loading system prompts, managing conversation state, determining model types, executing tool requests dispatched by the LLM, and handling error recovery.
 

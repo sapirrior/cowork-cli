@@ -5,7 +5,7 @@ import path from 'path';
 import os from 'os';
 import { Config } from './configManager.js';
 
-const configDir = path.join(os.homedir(), '.config', 'cowork');
+const configDir = path.join(os.homedir(), '.config', 'haiku');
 const authPath = path.join(configDir, 'auth.json');
 
 // ─── Provider Registry ────────────────────────────────────────────────────────
@@ -47,17 +47,17 @@ function loadAuthFile(): AuthConfig {
         parsed.providers = parsed.providers || {};
         return parsed as AuthConfig;
       } else {
-        logger.error(`Error loading configuration: ~/.config/cowork/auth.json is invalid.`);
+        logger.error(`Error loading configuration: ~/.config/haiku/auth.json is invalid.`);
       }
     }
   } catch (err: any) {
-    logger.error(`Error reading or parsing ~/.config/cowork/auth.json: ${err.message}`);
+    logger.error(`Error reading or parsing ~/.config/haiku/auth.json: ${err.message}`);
   }
   return { active: null, providers: {} };
 }
 
 /**
- * Writes the auth configuration back to ~/.config/cowork/auth.json
+ * Writes the auth configuration back to ~/.config/haiku/auth.json
  */
 function saveAuthFile(authConfig: AuthConfig): void {
   const tmpPath = authPath + '.tmp';

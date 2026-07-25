@@ -92,7 +92,7 @@ export default async function webFetch({ url }: WebFetchArgs): Promise<string> {
         signal: controller.signal,
         redirect: 'manual', // We handle redirects manually for safety
         headers: {
-          'User-Agent': 'cowork-cli/0.1 (Analyst Tool; SSRF-Protected)',
+          'User-Agent': 'haiku-67/0.1 (Analyst Tool; SSRF-Protected)',
           'Accept': 'text/html,application/xhtml+xml,application/json,text/plain'
         }
       });

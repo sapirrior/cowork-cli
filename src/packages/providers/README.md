@@ -1,4 +1,4 @@
-# A sub package named providers for cowork-cli for handling connections to model service providers and executing responses
+# A sub package named providers for haiku-67 for handling connections to model service providers and executing responses
 
 This package encapsulates interactions with the AI models, handles custom model client instantiations, manages context history, handles connection retries, and executes the conversation loop.
 

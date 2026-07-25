@@ -48,7 +48,7 @@ export async function selectProvider(uiInstance: UIInstance, items: SelectorItem
         cleanup();
         uiInstance.engine.unmountAll();
         
-        process.stdout.write(`${THEME.formatMain('◇')} ${THEME.formatDim('cowork login')}\n`);
+        process.stdout.write(`${THEME.formatMain('◇')} ${THEME.formatDim('haiku login')}\n`);
         process.stdout.write(`${THEME.formatMain('➔')} ${THEME.formatError('cancelled')}\n`);
         
         reject({ cancelled: true });
@@ -61,7 +61,7 @@ export async function selectProvider(uiInstance: UIInstance, items: SelectorItem
         
         const selectedItem = items[selectedIdx];
         
-        process.stdout.write(`${THEME.formatMain('◇')} ${THEME.formatDim('cowork login')}\n`);
+        process.stdout.write(`${THEME.formatMain('◇')} ${THEME.formatDim('haiku login')}\n`);
         process.stdout.write(`${THEME.formatMain('➔')} ${THEME.formatSuccess(`Selected: ${selectedItem.label}`)}\n`);
         
         resolve(selectedIdx);

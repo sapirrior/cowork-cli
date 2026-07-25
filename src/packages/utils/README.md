@@ -1,4 +1,4 @@
-# A sub package named utils for cowork-cli for housing core utilities for safe paths, CLI help guidelines, console logs, and ignore rules
+# A sub package named utils for haiku-67 for housing core utilities for safe paths, CLI help guidelines, console logs, and ignore rules
 
 This package contains low-level helpers used across all package directories for system status output formatting, directory traversal validation, and gitignore configuration resolution.
 

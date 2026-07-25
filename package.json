@@ -1,26 +1,32 @@
 {
-  "name": "cowork-cli",
+  "name": "haiku-67",
   "version": "4.0.0",
-  "description": "work with cowork",
+  "description": "Haiku — a read-only AI engineering co-worker for your terminal",
   "bin": {
-    "cowork": "dist/bin/cli.js"
+    "haiku": "dist/bin/cli.js",
+    "hku": "dist/bin/cli.js",
+    "hk": "dist/bin/cli.js"
   },
   "files": [
     "dist/",
     "README.md",
+    "CONTRIBUTING.md",
     "package.json"
   ],
   "keywords": [
     "cli",
-    "ai"
+    "ai",
+    "haiku",
+    "engineering",
+    "terminal"
   ],
-  "homepage": "https://github.com/sapirrior/cowork-cli#readme",
+  "homepage": "https://github.com/sapirrior/haiku-67#readme",
   "bugs": {
-    "url": "https://github.com/sapirrior/cowork-cli/issues"
+    "url": "https://github.com/sapirrior/haiku-67/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sapirrior/cowork-cli.git"
+    "url": "git+https://github.com/sapirrior/haiku-67.git"
   },
   "license": "MIT",
   "author": "nolan stark",

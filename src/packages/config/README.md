@@ -1,4 +1,4 @@
-# A sub package named config for cowork-cli for managing model provider configurations and the interactive setup flow
+# A sub package named config for haiku-67 for managing model provider configurations and the interactive setup flow
 
 This package is responsible for reading and validating credentials/model setups (such as API keys and base URLs) from the filesystem, verifying basic endpoint connectivity, and running the interactive credential wizard.
 
@@ -17,7 +17,7 @@ This package is responsible for reading and validating credentials/model setups 
 | `configManager.ts` | `loadConfig()` | Function | Reads credentials, performing schema validation and logging parsing/validation errors rather than silently swallowing them. Prioritizes the JSON structure in `~/.config/cowork/auth.json` (modern multi-provider configuration). Falls back to legacy `.env` in the user's home folder. |
 | | `validateConfig(config)` | Function | Verifies that all required fields (`model_name`, `model_url`, `model_api_key`, `model_type`) are present, typed correctly, and that the type is one of the supported provider clients (`openai`, `gemini`). |
 | | `verifyConnectivity(client)` | Function | Asynchronous connection test. Performs a dummy model list request (`client.models.list()`) to test endpoint health and API key validity. |
-| `loginWizard.ts` | `runLoginWizard(args)` | Function | Core entry point for `cowork --login [provider]` CLI command flows. Handles: <br>1. Flat list printing on invalid providers. <br>2. Switching active providers cleanly if credentials exist. <br>3. Launching the credential setup wizard form if not configured. <br>4. Interactive selector fallback when no args are passed. |
+| `loginWizard.ts` | `runLoginWizard(args)` | Function | Core entry point for `haiku --login [provider]` CLI command flows. Handles: <br>1. Flat list printing on invalid providers. <br>2. Switching active providers cleanly if credentials exist. <br>3. Launching the credential setup wizard form if not configured. <br>4. Interactive selector fallback when no args are passed. |
 | | `selectProvider(authConfig)` | Function | Maps provider configurations and delegates selector rendering to the TUI `loginForm.selectProvider` component. |
 | | `runCredentialForm(...)` | Function | Form workflow for credentials input. Delegates user prompts and text wrapping to `loginForm.inputField`, supporting pre-fills and required field checks. |
 | | `loadAuthFile()` | Function | Reads `~/.config/cowork/auth.json` into memory and checks for formatting errors. |

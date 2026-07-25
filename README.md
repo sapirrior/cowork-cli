@@ -1,7 +1,7 @@
-# 🚀 cowork-cli (`cowork`)
+# 🌿 haiku-67
 
-> **Stop waiting. Start knowing.**  
-> A minimalist, context-aware AI co-processor that lives in your terminal and understands your codebase.
+> **Stop waiting. Start knowing.**
+> A read-only AI engineering co-worker that lives in your terminal and understands your codebase.
 
 ---
 
@@ -9,44 +9,43 @@
 
 ### 📦 Installation
 ```bash
-npm install -g cowork-cli
+npm install -g haiku-67
 ```
 
 ### 🔑 Configuration
-Set up your AI provider interactively. `cowork` supports **any** OpenAI-compatible API (Ollama, OpenRouter, Google Gemini, OpenAI, etc.).
+Set up your AI provider interactively. `haiku` supports **any** OpenAI-compatible API (Ollama, OpenRouter, Google Gemini, OpenAI, etc.).
 
 ```bash
 # Open interactive login wizard (shows setup status & active configuration)
-cowork --login
+haiku --login
 
 # Or directly switch to / setup a specific provider
-cowork --login google
-cowork --login openai
-cowork --login openrouter
-cowork --login local
+haiku --login google
+haiku --login openai
+haiku --login openrouter
+haiku --login local
 ```
-*Credentials are saved in `~/.config/cowork/auth.json`.*
+*Credentials are saved in `~/.config/haiku/auth.json`.*
 
 ---
 
 ## 💡 Real-World Usage
 
-Instead of open-ended chatting, `cowork` **investigates** your project using safe, built-in tools (which respect `.gitignore`).
+Instead of open-ended chatting, `haiku` **investigates** your project using safe, built-in tools (which respect `.gitignore`).
 
 ### 🔍 Codebase Exploration
 ```bash
-cowork "Where is the authentication logic handled?"
+haiku "Where is the authentication logic handled?"
 ```
-*`cowork` recursively traverses folders, resolves imports, and prints a precise summary.*
 
 ### 🐛 Debugging & Analysis
 ```bash
-cowork "Find all 'FIXME' tags in src/ and point out the most critical one"
+haiku "Find all 'FIXME' tags in src/ and point out the most critical one"
 ```
 
 ### 🧬 Piping Inputs
 ```bash
-git diff | cowork "Write a clean commit message for these changes"
+git diff | haiku "Write a clean commit message for these changes"
 ```
 
 ---
@@ -87,7 +86,15 @@ src/
 
 | Command | Action |
 | :--- | :--- |
-| `cowork "<query>"` | Run a one-shot analysis on your codebase. |
-| `cowork -l`, `--login [provider]` | Interactive setup or active provider switch (`google`, `openai`, `openrouter`, `local`). |
-| `cowork -v`, `--version` | Print the active version. |
-| `cowork -h`, `--help` | Show usage options. |
+| `haiku "<query>"` | Run a one-shot analysis on your codebase. |
+| `haiku -l`, `--login [provider]` | Interactive setup or active provider switch (`google`, `openai`, `openrouter`, `local`). |
+| `haiku -v`, `--version` | Print the active version. |
+| `haiku -h`, `--help` | Show usage options. |
+
+**Aliases**: `haiku`, `hku`, and `hk` all invoke the same binary.
+
+---
+
+## 🤝 Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for architecture details, code style, and PR guidelines.

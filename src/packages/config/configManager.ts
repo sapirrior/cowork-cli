@@ -6,7 +6,7 @@ import { logger } from '../utils/index.js';
 import { OpenAI } from 'openai';
 
 const CONFIG_PATH = path.join(os.homedir(), '.env');
-const AUTH_JSON_PATH = path.join(os.homedir(), '.config', 'cowork', 'auth.json');
+const AUTH_JSON_PATH = path.join(os.homedir(), '.config', 'haiku', 'auth.json');
 
 export interface Config {
   model_name: string;
@@ -35,7 +35,7 @@ function isValidConfigObject(c: any): c is Config {
 }
 
 /**
- * Loads the user configuration from ~/.config/cowork/auth.json (or fallback ~/.env).
+ * Loads the user configuration from ~/.config/haiku/auth.json (or fallback ~/.env).
  * @returns {Config|null} The configuration object or null if it doesn't exist or is invalid.
  */
 export const loadConfig = (): Config | null => {
@@ -46,17 +46,17 @@ export const loadConfig = (): Config | null => {
       const authConfig: AuthConfig = JSON.parse(content);
       
       if (!authConfig || typeof authConfig !== 'object') {
-        logger.error(`Error loading configuration: ~/.config/cowork/auth.json is not a valid JSON object.`);
+        logger.error(`Error loading configuration: ~/.config/haiku/auth.json is not a valid JSON object.`);
       } else if (!authConfig.active) {
-        logger.error(`Error loading configuration: active provider is not set in ~/.config/cowork/auth.json.`);
+        logger.error(`Error loading configuration: active provider is not set in ~/.config/haiku/auth.json.`);
       } else if (!authConfig.providers || typeof authConfig.providers !== 'object') {
-        logger.error(`Error loading configuration: providers dictionary is missing in ~/.config/cowork/auth.json.`);
+        logger.error(`Error loading configuration: providers dictionary is missing in ~/.config/haiku/auth.json.`);
       } else {
         const activeConfig = authConfig.providers[authConfig.active];
         if (!activeConfig) {
-          logger.error(`Error loading configuration: active provider '${authConfig.active}' details are missing in ~/.config/cowork/auth.json.`);
+          logger.error(`Error loading configuration: active provider '${authConfig.active}' details are missing in ~/.config/haiku/auth.json.`);
         } else if (!isValidConfigObject(activeConfig)) {
-          logger.error(`Error loading configuration: active provider '${authConfig.active}' config in ~/.config/cowork/auth.json is invalid or incomplete.`);
+          logger.error(`Error loading configuration: active provider '${authConfig.active}' config in ~/.config/haiku/auth.json is invalid or incomplete.`);
         } else {
           return {
             model_name: activeConfig.model_name,
@@ -67,7 +67,7 @@ export const loadConfig = (): Config | null => {
         }
       }
     } catch (err: any) {
-      logger.error(`Error parsing ~/.config/cowork/auth.json: ${err.message}`);
+      logger.error(`Error parsing ~/.config/haiku/auth.json: ${err.message}`);
     }
   }
 
