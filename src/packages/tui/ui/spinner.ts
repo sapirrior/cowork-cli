@@ -36,7 +36,6 @@ export function fail(uiInstance: UIInstance, msg?: string): void {
 
 export function abortActiveSpinner(uiInstance: UIInstance): void {
   if (uiInstance.spinnerComponent) {
-    uiInstance.spinnerComponent.componentWillUnmount();
     uiInstance.engine.unmountAll();
     uiInstance.spinnerComponent = null;
   }
@@ -45,16 +44,14 @@ export function abortActiveSpinner(uiInstance: UIInstance): void {
 export function commitSpinner(uiInstance: UIInstance, msg: string | undefined, color: [number, number, number]): void {
   if (!uiInstance.spinnerComponent) return;
 
-  uiInstance.spinnerComponent.componentWillUnmount();
-  uiInstance.engine.clear();
-
   const label = uiInstance.spinnerComponent.state.label === 'Thinking...' ? 'Thought' : uiInstance.spinnerComponent.state.label;
   const data = msg !== undefined ? msg : uiInstance.spinnerComponent.state.data;
+
+  uiInstance.engine.unmountAll();
 
   const blueColor: [number, number, number] = [123, 165, 218];
   const dataStr = data ? ` ${rgb(blueColor, '(')}${rgb([194, 198, 197], data)}${rgb(blueColor, ')')}` : '';
   process.stdout.write(`${rgb(color, '●')} ${rgb([242, 207, 110], label)}${dataStr}\n`);
 
-  uiInstance.engine.unmountAll();
   uiInstance.spinnerComponent = null;
 }

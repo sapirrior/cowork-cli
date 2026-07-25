@@ -1,4 +1,5 @@
 import Component from '../Component.js';
+import { THEME } from '../../theme.js';
 
 const THOUGHTS = [
   'Thinking...', 'Brewing...', 'Grooming...', 'Analyzing...',
@@ -97,11 +98,7 @@ export default class Spinner extends Component<SpinnerProps, SpinnerState> {
       }
     }
 
-    const blue = (str: string) => `\x1b[38;2;123;165;218m${str}\x1b[0m`;
-    const amber = (str: string) => `\x1b[38;2;242;207;110m${str}\x1b[0m`;
-    const silver = (str: string) => `\x1b[38;2;194;198;197m${str}\x1b[0m`;
-
-    const dataStr = truncatedData ? ` ${blue('(')}${silver(truncatedData)}${blue(')')}` : '';
-    return [`${blue(frame)} ${amber(label)}${dataStr}`];
+    const dataStr = truncatedData ? ` ${THEME.formatMain('(')}${THEME.formatNormal(truncatedData)}${THEME.formatMain(')')}` : '';
+    return [`${THEME.formatMain(frame)} ${THEME.formatTool(label)}${dataStr}`];
   }
 }

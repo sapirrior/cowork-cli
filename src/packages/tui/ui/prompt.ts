@@ -1,4 +1,4 @@
-import PromptInput from '../engine/components/PromptInput.js';
+import InputBox from '../engine/components/InputBox.js';
 import SelectionList from '../engine/components/SelectionList.js';
 import { rgb, dim } from './format.js';
 
@@ -13,13 +13,16 @@ export async function ask(uiInstance: UIInstance, question: string): Promise<str
     throw new Error('stdin is not a TTY');
   }
 
-  const inputComp = new PromptInput({ question, currentVal: '' });
+  const inputComp = new InputBox({ label: question, currentVal: '' });
   uiInstance.engine.mount(inputComp, { keepCursorVisible: true });
 
-  return new Promise((resolve, reject) => {
-    let buffer = '';
+  let buffer = '';
+  let cursorIndex = 0;
+  let onData: (chunk: Buffer) => void;
+  let cleanup: () => void;
 
-    const onData = (chunk: Buffer) => {
+  const promise = new Promise<string>((resolve, reject) => {
+    onData = (chunk: Buffer) => {
       const str = chunk.toString();
 
       if (str === '\u0003') {
@@ -35,9 +38,44 @@ export async function ask(uiInstance: UIInstance, question: string): Promise<str
         return;
       }
 
+      // Arrow keys navigation
+      if (str === '\u001b[D') { // Left Arrow
+        cursorIndex = Math.max(0, cursorIndex - 1);
+        inputComp.setState({ cursorIndex });
+        return;
+      }
+      if (str === '\u001b[C') { // Right Arrow
+        cursorIndex = Math.min(buffer.length, cursorIndex + 1);
+        inputComp.setState({ cursorIndex });
+        return;
+      }
+
+      // Home & End keys
+      if (str === '\u001b[H' || str === '\u001bOH' || str === '\u001b[1~') { // Home
+        cursorIndex = 0;
+        inputComp.setState({ cursorIndex });
+        return;
+      }
+      if (str === '\u001b[F' || str === '\u001bOF' || str === '\u001b[4~') { // End
+        cursorIndex = buffer.length;
+        inputComp.setState({ cursorIndex });
+        return;
+      }
+
+      // Backspace (Delete character behind the cursor)
       if (str === '\u007f' || str === '\b') {
-        if (buffer.length > 0) {
-          buffer = buffer.slice(0, -1);
+        if (cursorIndex > 0) {
+          buffer = buffer.slice(0, cursorIndex - 1) + buffer.slice(cursorIndex);
+          cursorIndex--;
+          inputComp.setState({ currentVal: buffer, cursorIndex });
+        }
+        return;
+      }
+
+      // Delete key (Delete character in front of the cursor)
+      if (str === '\u001b[3~') {
+        if (cursorIndex < buffer.length) {
+          buffer = buffer.slice(0, cursorIndex) + buffer.slice(cursorIndex + 1);
           inputComp.setState({ currentVal: buffer });
         }
         return;
@@ -55,13 +93,21 @@ export async function ask(uiInstance: UIInstance, question: string): Promise<str
         return;
       }
 
-      if (str.length === 1 && str >= ' ') {
-        buffer += str;
-        inputComp.setState({ currentVal: buffer });
+      // Ignore other control sequences
+      if (str.startsWith('\u001b')) {
+        return;
+      }
+
+      // Allow pasting multiple characters by filtering out control characters
+      const cleanStr = str.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+      if (cleanStr.length > 0) {
+        buffer = buffer.slice(0, cursorIndex) + cleanStr + buffer.slice(cursorIndex);
+        cursorIndex += cleanStr.length;
+        inputComp.setState({ currentVal: buffer, cursorIndex });
       }
     };
 
-    const cleanup = () => {
+    cleanup = () => {
       if (process.stdin.isTTY) {
         process.stdin.setRawMode(false);
       }
@@ -75,6 +121,15 @@ export async function ask(uiInstance: UIInstance, question: string): Promise<str
     process.stdin.resume();
     process.stdin.on('data', onData);
   });
+
+  const exitCleanup = () => {
+    if (cleanup) cleanup();
+  };
+  process.once('exit', exitCleanup);
+
+  return promise.finally(() => {
+    process.off('exit', exitCleanup);
+  });
 }
 
 export async function confirm(uiInstance: UIInstance, question: string): Promise<{ confirmed: boolean; dismissed?: boolean }> {
@@ -87,10 +142,13 @@ export async function confirm(uiInstance: UIInstance, question: string): Promise
   const listComp = new SelectionList({ question, items: ['Yes', 'No'], selectedIdx: 0 });
   uiInstance.engine.mount(listComp);
 
-  return new Promise((resolve) => {
+  let onData: (chunk: Buffer) => void;
+  let cleanup: () => void;
+
+  const promise = new Promise<{ confirmed: boolean; dismissed?: boolean }>((resolve) => {
     let selectedYes = true;
 
-    const onData = (chunk: Buffer) => {
+    onData = (chunk: Buffer) => {
       const str = chunk.toString();
 
       if (str === '\u0003') {
@@ -129,7 +187,7 @@ export async function confirm(uiInstance: UIInstance, question: string): Promise
       }
     };
 
-    const cleanup = () => {
+    cleanup = () => {
       if (process.stdin.isTTY) {
         process.stdin.setRawMode(false);
       }
@@ -142,5 +200,14 @@ export async function confirm(uiInstance: UIInstance, question: string): Promise
     }
     process.stdin.resume();
     process.stdin.on('data', onData);
+  });
+
+  const exitCleanup = () => {
+    if (cleanup) cleanup();
+  };
+  process.once('exit', exitCleanup);
+
+  return promise.finally(() => {
+    process.off('exit', exitCleanup);
   });
 }

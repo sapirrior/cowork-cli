@@ -1,4 +1,5 @@
 import Component from '../Component.js';
+import { THEME } from '../../theme.js';
 
 interface SelectorItem {
   label: string;
@@ -31,11 +32,6 @@ export default class ProviderSelector extends Component<ProviderSelectorProps, P
   override render(): string[] {
     const { title, items, selectedIdx } = this.state;
 
-    const blue = (str: string) => `\x1b[38;2;123;165;218m${str}\x1b[0m`;
-    const yellow = (str: string) => `\x1b[38;2;242;207;110m${str}\x1b[0m`;
-    const dim = (str: string) => `\x1b[2m${str}\x1b[0m`;
-    const bold = (str: string) => `\x1b[1m${str}\x1b[0m`;
-
     const width = process.stdout.columns || 80;
 
     // Truncate title if it exceeds terminal width
@@ -45,7 +41,7 @@ export default class ProviderSelector extends Component<ProviderSelectorProps, P
       : title;
 
     const lines: string[] = [];
-    lines.push(`${blue('◇')} ${yellow(bold(displayTitle))}`);
+    lines.push(`${THEME.formatMain('◇')} ${THEME.formatTool(THEME.bold(displayTitle))}`);
     lines.push('');
 
     const itemsLines = items.map((item, idx) => {
@@ -61,11 +57,11 @@ export default class ProviderSelector extends Component<ProviderSelectorProps, P
       }
 
       if (isSelected) {
-        return `${blue('➔ ')}${blue(`[ ${fullLabel} ]`)}`;
+        return `${THEME.formatMain('➔ ')}${THEME.formatMain(`[ ${fullLabel} ]`)}`;
       } else if (item.configured) {
         return `    ${fullLabel}`;
       } else {
-        return dim(`    ${fullLabel}`);
+        return THEME.formatDim(`    ${fullLabel}`);
       }
     });
 

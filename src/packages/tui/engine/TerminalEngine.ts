@@ -38,6 +38,19 @@ export default class TerminalEngine {
   previousCursor: { line: number; column: number } | null;
   previousCursorLine: number | undefined;
   private resizeHandler: () => void;
+  private _syncActive = false;
+
+  private _beginSync(): string {
+    if (this._syncActive) return '';
+    this._syncActive = true;
+    return '\x1b[?2026h';
+  }
+
+  private _endSync(): string {
+    if (!this._syncActive) return '';
+    this._syncActive = false;
+    return '\x1b[?2026l';
+  }
 
   constructor() {
     this.components = [];
@@ -143,11 +156,11 @@ export default class TerminalEngine {
         getVisualLineCountAt(this.previousBuffer, curWidth)
       );
       if (prevVisualRows > 0) {
-        let clearOutput = '\x1b[?2026h';
+        let clearOutput = this._beginSync();
         // On clear we always treat cursor as being at bottom of the frame.
-        const upOffset = Math.min(prevVisualRows - 1, (process.stdout.rows || 24) - 1);
+        const upOffset = Math.max(0, Math.min(prevVisualRows - 1, (process.stdout.rows || 24) - 1));
         if (upOffset > 0) clearOutput += `\x1b[${upOffset}A`;
-        clearOutput += '\r\x1b[J\x1b[?2026l';
+        clearOutput += '\r\x1b[J' + this._endSync();
         process.stdout.write(clearOutput);
       }
       this.previousBuffer = [];
@@ -264,7 +277,7 @@ export default class TerminalEngine {
 
     // Batch all ANSI movements and clears into a single write buffer string.
     // \x1b[?2026h / \x1b[?2026l = synchronized output — terminal paints atomically.
-    let output = '\x1b[?2026h';
+    let output = this._beginSync();
 
     // If the new frame needs more physical rows, pre-scroll to reserve space.
     if (this.previousBuffer.length > 0 && nextVisualRows > prevVisualRows) {
@@ -307,7 +320,7 @@ export default class TerminalEngine {
       output += `\r\x1b[${targetCol}G`;
     }
 
-    output += '\x1b[?2026l'; // End synchronized output
+    output += this._endSync(); // End synchronized output
 
     // Write everything to stdout in a single write operation to prevent flicker
     process.stdout.write(output);

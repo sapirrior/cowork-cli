@@ -55,12 +55,20 @@ function applyInlineStyles(str: string): string {
   return res;
 }
 
+interface StyleState {
+  fg: string | null;
+  bold: boolean;
+  dim: boolean;
+}
+
 function balanceAnsiStyles(wrappedLines: string[]): string[] {
-  let activeColor: string | null = null;
+  let state: StyleState = { fg: null, bold: false, dim: false };
 
   return wrappedLines.map(line => {
     let prefix = '';
-    if (activeColor) prefix += activeColor;
+    if (state.bold) prefix += '\x1b[1m';
+    if (state.dim)  prefix += '\x1b[2m';
+    if (state.fg)   prefix += state.fg;
 
     const ansiRegex = /\x1b\[([0-9;]*)m/g;
     let match: RegExpExecArray | null;
@@ -68,26 +76,36 @@ function balanceAnsiStyles(wrappedLines: string[]): string[] {
       const code = match[1];
       const parts = code.split(';');
 
-      if (parts.includes('0') || parts.includes('39')) {
-        activeColor = null;
-      }
-
-      for (let i = 0; i < parts.length; i++) {
-        const part = parts[i];
-        if (part === '38') {
-          if (parts[i + 1] === '2' || parts[i + 1] === '5') {
-            activeColor = match[0];
-            break;
+      if (parts.includes('0')) {
+        state = { fg: null, bold: false, dim: false };
+      } else {
+        if (parts.includes('1')) state.bold = true;
+        if (parts.includes('2')) state.dim = true;
+        if (parts.includes('22')) {
+          state.bold = false;
+          state.dim = false;
+        }
+        if (parts.includes('39')) {
+          state.fg = null;
+        }
+        // Match foreground color escapes: 38;2;r;g;b or 38;5;n or 30-37 (named fg)
+        if (parts[0] === '38' && (parts[1] === '2' || parts[1] === '5')) {
+          state.fg = match[0];
+        } else {
+          // Check for individual parts that are named foreground colors (30-37, 90-97)
+          for (const part of parts) {
+            if ((/^3[0-7]$/.test(part) || /^9[0-7]$/.test(part)) && part !== '39') {
+              state.fg = `\x1b[${part}m`;
+            }
           }
-        } else if (/^[39][0-9]$/.test(part) && part !== '39') {
-          activeColor = match[0];
-          break;
         }
       }
     }
 
     let suffix = '';
-    if (activeColor) suffix += '\x1b[39m';
+    if (state.bold || state.dim || state.fg) {
+      suffix += '\x1b[0m';
+    }
 
     return prefix + line + suffix;
   });

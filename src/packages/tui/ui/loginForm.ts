@@ -1,6 +1,6 @@
 import ProviderSelector from '../engine/components/ProviderSelector.js';
 import InputBox from '../engine/components/InputBox.js';
-import { rgb, dim } from './format.js';
+import { THEME } from '../theme.js';
 
 interface SelectorItem {
   label: string;
@@ -35,22 +35,21 @@ export async function selectProvider(uiInstance: UIInstance, items: SelectorItem
   const selectorComp = new ProviderSelector({ items, selectedIdx: 0 });
   uiInstance.engine.mount(selectorComp);
 
-  return new Promise((resolve, reject) => {
+  let onData: (chunk: Buffer) => void;
+  let cleanup: () => void;
+
+  const promise = new Promise<number>((resolve, reject) => {
     let selectedIdx = 0;
 
-    const onData = (chunk: Buffer) => {
+    onData = (chunk: Buffer) => {
       const str = chunk.toString();
 
       if (str === '\u0003') { // Ctrl+C
         cleanup();
         uiInstance.engine.unmountAll();
         
-        const blueColor: [number, number, number] = [123, 165, 218];
-        const redColor: [number, number, number] = [224, 112, 112];
-        const dimColor: [number, number, number] = [194, 198, 197];
-        
-        process.stdout.write(`${rgb(blueColor, '◇')} ${rgb(dimColor, 'cowork login')}\n`);
-        process.stdout.write(`${rgb(blueColor, '➔')} ${rgb(redColor, 'cancelled')}\n`);
+        process.stdout.write(`${THEME.formatMain('◇')} ${THEME.formatDim('cowork login')}\n`);
+        process.stdout.write(`${THEME.formatMain('➔')} ${THEME.formatError('cancelled')}\n`);
         
         reject({ cancelled: true });
         return;
@@ -60,13 +59,10 @@ export async function selectProvider(uiInstance: UIInstance, items: SelectorItem
         cleanup();
         uiInstance.engine.unmountAll();
         
-        const blueColor: [number, number, number] = [123, 165, 218];
-        const greenColor: [number, number, number] = [122, 195, 145];
-        const dimColor: [number, number, number] = [194, 198, 197];
         const selectedItem = items[selectedIdx];
         
-        process.stdout.write(`${rgb(blueColor, '◇')} ${rgb(dimColor, 'cowork login')}\n`);
-        process.stdout.write(`${rgb(blueColor, '➔')} ${rgb(greenColor, `Selected: ${selectedItem.label}`)}\n`);
+        process.stdout.write(`${THEME.formatMain('◇')} ${THEME.formatDim('cowork login')}\n`);
+        process.stdout.write(`${THEME.formatMain('➔')} ${THEME.formatSuccess(`Selected: ${selectedItem.label}`)}\n`);
         
         resolve(selectedIdx);
         return;
@@ -81,7 +77,7 @@ export async function selectProvider(uiInstance: UIInstance, items: SelectorItem
       }
     };
 
-    const cleanup = () => {
+    cleanup = () => {
       if (process.stdin.isTTY) {
         process.stdin.setRawMode(false);
       }
@@ -94,6 +90,15 @@ export async function selectProvider(uiInstance: UIInstance, items: SelectorItem
     }
     process.stdin.resume();
     process.stdin.on('data', onData);
+  });
+
+  const exitCleanup = () => {
+    if (cleanup) cleanup();
+  };
+  process.once('exit', exitCleanup);
+
+  return promise.finally(() => {
+    process.off('exit', exitCleanup);
   });
 }
 
@@ -120,23 +125,22 @@ export async function inputField(
 
   uiInstance.engine.mount(inputComp, { keepCursorVisible: true });
 
-  return new Promise((resolve, reject) => {
+  let onData: (chunk: Buffer) => void;
+  let cleanup: () => void;
+
+  const promise = new Promise<string>((resolve, reject) => {
     let buffer = '';
     let cursorIndex = 0;
 
-    const onData = (chunk: Buffer) => {
+    onData = (chunk: Buffer) => {
       const str = chunk.toString();
 
       if (str === '\u0003') { // Ctrl+C
         cleanup();
         uiInstance.engine.unmountAll();
         
-        const blueColor: [number, number, number] = [123, 165, 218];
-        const redColor: [number, number, number] = [224, 112, 112];
-        const silverColor: [number, number, number] = [194, 198, 197];
-        
-        process.stdout.write(`${rgb(blueColor, '◈')} ${rgb(silverColor, label)}${hint ? ' ' + dim(hint) : ''}\n`);
-        process.stdout.write(`${rgb(blueColor, '➔')} ${rgb(redColor, 'cancelled')}\n`);
+        process.stdout.write(`${THEME.formatMain('◈')} ${THEME.formatNormal(label)}${hint ? ' ' + THEME.formatDim(hint) : ''}\n`);
+        process.stdout.write(`${THEME.formatMain('➔')} ${THEME.formatError('cancelled')}\n`);
         
         reject({ cancelled: true });
         return;
@@ -196,15 +200,11 @@ export async function inputField(
         cleanup();
         uiInstance.engine.unmountAll();
 
-        const blueColor: [number, number, number] = [123, 165, 218];
-        const greenColor: [number, number, number] = [122, 195, 145];
-        const silverColor: [number, number, number] = [194, 198, 197];
-        
         const resolvedVal = finalVal || fallback;
         const displayVal = masked ? '•'.repeat(resolvedVal.length) : resolvedVal;
 
-        process.stdout.write(`${rgb(blueColor, '◈')} ${rgb(silverColor, label)}${hint ? ' ' + dim(hint) : ''}\n`);
-        process.stdout.write(`${rgb(blueColor, '➔')} ${rgb(greenColor, displayVal)}\n`);
+        process.stdout.write(`${THEME.formatMain('◈')} ${THEME.formatNormal(label)}${hint ? ' ' + THEME.formatDim(hint) : ''}\n`);
+        process.stdout.write(`${THEME.formatMain('➔')} ${THEME.formatSuccess(displayVal)}\n`);
         
         resolve(resolvedVal);
         return;
@@ -215,15 +215,16 @@ export async function inputField(
         return;
       }
 
-      // Insert printable characters at current cursor index
-      if (str.length === 1 && str >= ' ') {
-        buffer = buffer.slice(0, cursorIndex) + str + buffer.slice(cursorIndex);
-        cursorIndex++;
+      // Allow pasting multiple characters by filtering out control characters
+      const cleanStr = str.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+      if (cleanStr.length > 0) {
+        buffer = buffer.slice(0, cursorIndex) + cleanStr + buffer.slice(cursorIndex);
+        cursorIndex += cleanStr.length;
         inputComp.setState({ currentVal: buffer, cursorIndex, error: null });
       }
     };
 
-    const cleanup = () => {
+    cleanup = () => {
       if (process.stdin.isTTY) {
         process.stdin.setRawMode(false);
       }
@@ -236,6 +237,15 @@ export async function inputField(
     }
     process.stdin.resume();
     process.stdin.on('data', onData);
+  });
+
+  const exitCleanup = () => {
+    if (cleanup) cleanup();
+  };
+  process.once('exit', exitCleanup);
+
+  return promise.finally(() => {
+    process.off('exit', exitCleanup);
   });
 }
 

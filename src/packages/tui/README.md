@@ -34,7 +34,7 @@ Holds the controller code split from the previous monolithic UI module.
 
 * #### `prompt.ts`
   Interactive prompt loop routines.
-  - `ask(uiInstance, question)`: Renders input components with inline text. Listens for character strokes, backspace `\x7f`, and Carriage Return keys. Resolves text strings, or rejects on Ctrl+C cancels.
+  - `ask(uiInstance, question)`: Renders input components with inline text. Listens for character strokes, backspace `\x7f`, pasting, home/end, delete, and arrow-key cursor navigation. Resolves text strings, or rejects on Ctrl+C cancels.
   - `confirm(uiInstance, question)`: Arrow-key toggle prompt. Displays styled selection lines for Yes/No options.
 
 * #### `loginForm.ts`
@@ -53,6 +53,9 @@ Holds the controller code split from the previous monolithic UI module.
   Text styling ANSI helpers.
   - `rgb(rgbArr, text)`: Encapsulates text inside TrueColor ANSI sequences (`\x1b[38;2;R;G;Bm...`).
   - `bold(text)` / `dim(text)`: Returns text enclosed in bold and dim ANSI modifiers.
+
+* #### `theme.ts`
+  Centralizes the TUI color configuration system by loading color accents from config.json and providing type-safe color formatter helpers.
 
 * #### `outputFormatter.ts`
   Markdown rendering helper. Parses standard markdown strings (headings, bold text, blocks, inline quotes, and URLs) and outputs ANSI-styled equivalents to match terminal color templates.
@@ -75,6 +78,5 @@ A lightweight component frame loop implementation.
 * #### UI Elements (`engine/components/` Sub-directory)
   - `Spinner.ts`: Renders live text loaders and frames for rotating characters.
   - `SelectionList.ts`: Highlights selected items in arrow-key selections.
-  - `PromptInput.ts`: Tracks keystrokes for active prompt buffers.
-  - `InputBox.ts`: Full-width horizontal bordered layout for in-line text input and error messages (supports cursor navigation, in-place editing, and wrapping).
+  - `InputBox.ts`: Full-width horizontal bordered layout for in-line text input and error messages (supports cursor navigation, in-place editing, pasting, and wrapping).
   - `ProviderSelector.ts`: Non-boxed list selection menu showing ticks, active status, and custom highlights.

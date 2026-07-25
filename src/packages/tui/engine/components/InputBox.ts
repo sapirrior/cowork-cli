@@ -1,4 +1,6 @@
 import Component from '../Component.js';
+import stringWidth from 'string-width';
+import { THEME } from '../../theme.js';
 
 interface InputBoxProps {
   label?: string;
@@ -37,10 +39,14 @@ export default class InputBox extends Component<InputBoxProps, InputBoxState> {
   override getCursorPosition(): { line: number; column: number } {
     const width = process.stdout.columns || 80;
     const maxWidth = Math.max(10, width - 2);
-    const { cursorIndex } = this.state;
+    const { cursorIndex, currentVal, masked } = this.state;
     
-    const cursorLineOffset = Math.floor(cursorIndex / maxWidth);
-    const cursorColOffset = cursorIndex % maxWidth;
+    const sub = currentVal.substring(0, cursorIndex);
+    const displaySub = masked ? '•'.repeat(sub.length) : sub;
+    const visualWidth = stringWidth(displaySub);
+    
+    const cursorLineOffset = Math.floor(visualWidth / maxWidth);
+    const cursorColOffset = visualWidth % maxWidth;
 
     return {
       line: 2 + cursorLineOffset,
@@ -51,12 +57,7 @@ export default class InputBox extends Component<InputBoxProps, InputBoxState> {
   override render(): string[] {
     const { label, hint, currentVal, masked, error } = this.state;
 
-    const blue = (str: string) => `\x1b[38;2;123;165;218m${str}\x1b[0m`;
-    const red = (str: string) => `\x1b[38;2;224;112;112m${str}\x1b[0m`;
-    const dim = (str: string) => `\x1b[2m${str}\x1b[0m`;
-    const bold = (str: string) => `\x1b[1m${str}\x1b[0m`;
-
-    const borderCol = error ? red : dim;
+    const borderCol = error ? THEME.formatError : THEME.formatDim;
     const width = process.stdout.columns || 80;
     
     // Draw horizontal borders slightly shorter than width to prevent terminal auto-wrap
@@ -76,9 +77,9 @@ export default class InputBox extends Component<InputBoxProps, InputBoxState> {
         displayLabel = displayLabel.slice(0, maxLabelWidth - 3) + '...';
       }
     }
-    const symbol = error ? red('◈') : blue('◈');
-    const hintPart = displayHint ? ` ${dim(displayHint)}` : '';
-    lines.push(`${symbol} ${bold(displayLabel)}${hintPart}`);
+    const symbol = error ? THEME.formatError('◈') : THEME.formatMain('◈');
+    const hintPart = displayHint ? ` ${THEME.formatDim(displayHint)}` : '';
+    lines.push(`${symbol} ${THEME.bold(displayLabel)}${hintPart}`);
 
     // Line 2: Top border
     lines.push(horizontalLine);
@@ -109,7 +110,7 @@ export default class InputBox extends Component<InputBoxProps, InputBoxState> {
       if (displayError.length > width - 6) {
         displayError = displayError.slice(0, width - 9) + '...';
       }
-      lines.push(`  ${red('✖')} ${red(displayError)}`);
+      lines.push(`  ${THEME.formatError('✖')} ${THEME.formatError(displayError)}`);
     }
 
     return lines;

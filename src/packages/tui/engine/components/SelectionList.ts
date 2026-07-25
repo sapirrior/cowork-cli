@@ -1,4 +1,5 @@
 import Component from '../Component.js';
+import { THEME } from '../../theme.js';
 
 interface SelectionListProps {
   question?: string;
@@ -25,20 +26,16 @@ export default class SelectionList extends Component<SelectionListProps, Selecti
   override render(): string[] {
     const { question, items, selectedIdx } = this.state;
 
-    const blue = (str: string) => `\x1b[38;2;123;165;218m${str}\x1b[0m`;
-    const yellow = (str: string) => `\x1b[38;2;242;207;110m${str}\x1b[0m`;
-    const dim = (str: string) => `\x1b[2m${str}\x1b[0m`;
-
     const lines: string[] = [];
     if (question) {
-      lines.push(`${blue('◇')} ${yellow('Ask Confirm')}`);
-      lines.push(yellow(question));
+      lines.push(`${THEME.formatMain('◇')} ${THEME.formatTool('Ask Confirm')}`);
+      lines.push(THEME.formatTool(question));
     }
 
     const itemsLines = items.map((item, idx) => {
       const isSelected = idx === selectedIdx;
-      const prefix = isSelected ? blue('➔ ') : '  ';
-      const text = isSelected ? blue(`[ ${item} ]`) : dim(`  ${item}  `);
+      const prefix = isSelected ? THEME.formatMain('➔ ') : '  ';
+      const text = isSelected ? THEME.formatMain(`[ ${item} ]`) : THEME.formatDim(`  ${item}  `);
       return `${prefix}${text}`;
     });
 

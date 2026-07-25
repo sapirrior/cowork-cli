@@ -16,8 +16,22 @@ export interface Config {
 }
 
 interface AuthConfig {
+  version?: number;
   active: string | null;
   providers: Record<string, Config>;
+}
+
+/**
+ * Validates a single provider config object.
+ */
+function isValidConfigObject(c: any): c is Config {
+  if (!c || typeof c !== 'object') return false;
+  return (
+    typeof c.model_name === 'string' && c.model_name.trim() !== '' &&
+    typeof c.model_url === 'string' && c.model_url.trim() !== '' &&
+    typeof c.model_api_key === 'string' && c.model_api_key.trim() !== '' &&
+    typeof c.model_type === 'string' && ['openai', 'gemini'].includes(c.model_type.toLowerCase())
+  );
 }
 
 /**
@@ -26,22 +40,35 @@ interface AuthConfig {
  */
 export const loadConfig = (): Config | null => {
   // 1. Try reading the modern auth.json multi-provider configuration
-  try {
-    if (fs.existsSync(AUTH_JSON_PATH)) {
+  if (fs.existsSync(AUTH_JSON_PATH)) {
+    try {
       const content = fs.readFileSync(AUTH_JSON_PATH, 'utf8');
       const authConfig: AuthConfig = JSON.parse(content);
-      if (authConfig && authConfig.active && authConfig.providers && authConfig.providers[authConfig.active]) {
+      
+      if (!authConfig || typeof authConfig !== 'object') {
+        logger.error(`Error loading configuration: ~/.config/cowork/auth.json is not a valid JSON object.`);
+      } else if (!authConfig.active) {
+        logger.error(`Error loading configuration: active provider is not set in ~/.config/cowork/auth.json.`);
+      } else if (!authConfig.providers || typeof authConfig.providers !== 'object') {
+        logger.error(`Error loading configuration: providers dictionary is missing in ~/.config/cowork/auth.json.`);
+      } else {
         const activeConfig = authConfig.providers[authConfig.active];
-        return {
-          model_name: activeConfig.model_name,
-          model_url: activeConfig.model_url,
-          model_api_key: activeConfig.model_api_key,
-          model_type: activeConfig.model_type
-        };
+        if (!activeConfig) {
+          logger.error(`Error loading configuration: active provider '${authConfig.active}' details are missing in ~/.config/cowork/auth.json.`);
+        } else if (!isValidConfigObject(activeConfig)) {
+          logger.error(`Error loading configuration: active provider '${authConfig.active}' config in ~/.config/cowork/auth.json is invalid or incomplete.`);
+        } else {
+          return {
+            model_name: activeConfig.model_name,
+            model_url: activeConfig.model_url,
+            model_api_key: activeConfig.model_api_key,
+            model_type: activeConfig.model_type
+          };
+        }
       }
+    } catch (err: any) {
+      logger.error(`Error parsing ~/.config/cowork/auth.json: ${err.message}`);
     }
-  } catch (err: any) {
-    logger.error(`Error loading configuration from ~/.config/cowork/auth.json: ${err.message}`);
   }
 
   // 2. Fall back to the legacy ~/.env file
@@ -63,7 +90,11 @@ export const loadConfig = (): Config | null => {
       ) as Partial<Config>;
 
       if (Object.keys(filteredConfig).length > 0) {
-        return filteredConfig as Config;
+        if (isValidConfigObject(filteredConfig)) {
+          return filteredConfig as Config;
+        } else {
+          logger.error(`Legacy ~/.env configuration is invalid or incomplete.`);
+        }
       }
     }
   } catch (err: any) {
@@ -78,14 +109,7 @@ export const loadConfig = (): Config | null => {
  * @returns {config is Config} True if valid, false otherwise.
  */
 export const validateConfig = (config: Config | null | undefined): config is Config => {
-  if (!config) return false;
-  const requiredKeys: (keyof Config)[] = ['model_name', 'model_url', 'model_api_key', 'model_type'];
-  const hasAllKeys = requiredKeys.every(key => config[key] && config[key].trim() !== '');
-  
-  if (!hasAllKeys) return false;
-
-  const validTypes = ['openai', 'gemini'];
-  return validTypes.includes(config.model_type.toLowerCase());
+  return isValidConfigObject(config);
 };
 
 /**

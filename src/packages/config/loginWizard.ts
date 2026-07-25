@@ -28,6 +28,7 @@ const PROVIDERS_MAP: Record<string, ProviderMeta> = {
 const PROVIDER_KEYS = ['google', 'openai', 'openrouter', 'local'];
 
 interface AuthConfig {
+  version?: number;
   active: string | null;
   providers: Record<string, Config>;
 }
@@ -45,10 +46,12 @@ function loadAuthFile(): AuthConfig {
       if (parsed && typeof parsed === 'object') {
         parsed.providers = parsed.providers || {};
         return parsed as AuthConfig;
+      } else {
+        logger.error(`Error loading configuration: ~/.config/cowork/auth.json is invalid.`);
       }
     }
-  } catch (err) {
-    // Ignore and fallback
+  } catch (err: any) {
+    logger.error(`Error reading or parsing ~/.config/cowork/auth.json: ${err.message}`);
   }
   return { active: null, providers: {} };
 }
@@ -57,13 +60,22 @@ function loadAuthFile(): AuthConfig {
  * Writes the auth configuration back to ~/.config/cowork/auth.json
  */
 function saveAuthFile(authConfig: AuthConfig): void {
+  const tmpPath = authPath + '.tmp';
   try {
     if (!fs.existsSync(configDir)) {
       fs.mkdirSync(configDir, { recursive: true });
     }
-    fs.writeFileSync(authPath, JSON.stringify(authConfig, null, 2), 'utf8');
-    logger.main(`Successfully updated configuration at ${authPath}`);
+    // Increment or initialize schema version
+    authConfig.version = 1;
+    fs.writeFileSync(tmpPath, JSON.stringify(authConfig, null, 2), { encoding: 'utf8', mode: 0o600 });
+    fs.renameSync(tmpPath, authPath);
+    ui.log(formatMain(`Successfully updated configuration at ${authPath}`));
   } catch (err: any) {
+    try {
+      if (fs.existsSync(tmpPath)) {
+        fs.unlinkSync(tmpPath);
+      }
+    } catch {}
     logger.error(`Failed to save auth configuration: ${err.message}`);
   }
 }
@@ -108,7 +120,7 @@ function providerLabel(key: string, authConfig: AuthConfig): string {
  * @param {AuthConfig} authConfig Loaded auth configuration.
  */
 function printProviderList(authConfig: AuthConfig): void {
-  console.log(formatSecondary('\nAvailable providers:'));
+  ui.log(formatSecondary('\nAvailable providers:'));
   for (const key of PROVIDER_KEYS) {
     const label    = providerLabel(key, authConfig);
     const isSetup  = !!(authConfig.providers && authConfig.providers[key]);
@@ -122,9 +134,9 @@ function printProviderList(authConfig: AuthConfig): void {
     } else {
       line = formatDim(`  ${label}`);
     }
-    console.log(line);
+    ui.log(line);
   }
-  console.log('');
+  ui.log('');
 }
 
 // ─── Interactive Selector ─────────────────────────────────────────────────────
@@ -198,7 +210,7 @@ async function runCredentialForm(providerKey: string, authConfig: AuthConfig): P
   const meta     = PROVIDERS_MAP[providerKey];
   const existing = authConfig.providers[providerKey] || {};
 
-  console.log(formatHeader(`\nConfiguring ${meta.name}...`));
+  ui.log(formatHeader(`\nConfiguring ${meta.name}...`));
 
   let config: Config = {
     model_type:    meta.type,
@@ -245,7 +257,7 @@ export async function runLoginWizard(args: string[] = []): Promise<void> {
 
       // A1. Invalid provider
       if (!key) {
-        console.log(formatError(`Unknown provider: '${passedArg}'.`));
+        ui.log(formatError(`Unknown provider: '${passedArg}'.`));
         printProviderList(authConfig);
         return;
       }
@@ -254,13 +266,13 @@ export async function runLoginWizard(args: string[] = []): Promise<void> {
       if (authConfig.providers[key]) {
         authConfig.active = key;
         saveAuthFile(authConfig);
-        console.log(formatMain(`Active provider set to: ${PROVIDERS_MAP[key].name}`));
+        ui.log(formatMain(`Active provider set to: ${PROVIDERS_MAP[key].name}`));
         printProviderList(authConfig);
         return;
       }
 
       // A3. Valid but NOT configured → run credential form directly
-      console.log(formatSecondary(`Provider '${PROVIDERS_MAP[key].name}' is not set up yet. Starting setup...`));
+      ui.log(formatSecondary(`Provider '${PROVIDERS_MAP[key].name}' is not set up yet. Starting setup...`));
       await runCredentialForm(key, authConfig);
       printProviderList(authConfig);
       return;
@@ -273,7 +285,7 @@ export async function runLoginWizard(args: string[] = []): Promise<void> {
 
   } catch (err: any) {
     if (err && err.cancelled) {
-      console.log(formatDim('Selection aborted cleanly.'));
+      ui.log(formatDim('Selection aborted cleanly.'));
     } else {
       logger.error('Error during setup: ' + (err.message || err));
     }
