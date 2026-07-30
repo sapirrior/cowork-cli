@@ -2,6 +2,7 @@ import { show_help, logger } from "../packages/utils/index.js";
 import { clientLoader } from "../packages/providers/index.js";
 import { runQuery } from "../packages/agent/index.js";
 import { loadConfig, verifyConnectivity, runLoginWizard } from "../packages/config/index.js";
+import { ui } from "../packages/tui/index.js";
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -68,14 +69,29 @@ export default async function main(args: string[]): Promise<void> {
   const config = loadConfig();
 
   // clientLoader handles config validation and throws if invalid
-  const client = clientLoader();
+  let client;
+  try {
+    client = clientLoader();
+  } catch (err: any) {
+    logger.error(err.message);
+    process.exitCode = 1;
+    await ui.cleanup();
+    return;
+  }
   
   // Silent connectivity check: logs only on failure
   const isConnected = await verifyConnectivity(client);
   if (!isConnected) {
     process.exitCode = 1;
+    await ui.cleanup();
     return;
   }
 
-  await runQuery(client, config!, query);
+  try {
+    await runQuery(client, config!, query);
+  } catch (err: any) {
+    process.exitCode = 1;
+  } finally {
+    await ui.cleanup();
+  }
 }

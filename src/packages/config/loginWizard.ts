@@ -268,6 +268,7 @@ export async function runLoginWizard(args: string[] = []): Promise<void> {
         saveAuthFile(authConfig);
         ui.log(formatMain(`Active provider set to: ${PROVIDERS_MAP[key].name}`));
         printProviderList(authConfig);
+        await ui.cleanup();
         return;
       }
 
@@ -275,6 +276,7 @@ export async function runLoginWizard(args: string[] = []): Promise<void> {
       ui.log(formatSecondary(`Provider '${PROVIDERS_MAP[key].name}' is not set up yet. Starting setup...`));
       await runCredentialForm(key, authConfig);
       printProviderList(authConfig);
+      await ui.cleanup();
       return;
     }
 
@@ -282,12 +284,15 @@ export async function runLoginWizard(args: string[] = []): Promise<void> {
     const selectedKey = await selectProvider(authConfig);
     await runCredentialForm(selectedKey, authConfig);
     printProviderList(authConfig);
+    await ui.cleanup();
 
   } catch (err: any) {
     if (err && err.cancelled) {
       ui.log(formatDim('Selection aborted cleanly.'));
+      await ui.cleanup();
     } else {
       logger.error('Error during setup: ' + (err.message || err));
+      await ui.cleanup();
     }
   }
 }

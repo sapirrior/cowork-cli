@@ -6,7 +6,7 @@ Welcome, AI Coding Agent! This document contains machine-readable context, archi
 
 ## 🎯 Executive Context
 
-`cowork-cli` is an agentic command-line developer assistant. It operates a context-aware tool execution loop in standard terminal environments.
+`haiku-67` is an agentic command-line developer assistant. It operates a context-aware tool execution loop in standard terminal environments.
 
 *   **Tech Stack**: Node.js, TypeScript (Strict Mode), ES Modules (`"type": "module"`), OpenAI SDK, and raw ANSI Escape Codes (no heavy terminal library dependencies).
 *   **Compilation & Runs**:

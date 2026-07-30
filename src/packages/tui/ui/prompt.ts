@@ -116,13 +116,12 @@ export async function ask(uiInstance: UIInstance, question: string): Promise<str
         process.stdin.setRawMode(false);
       }
       process.stdin.off('data', onData);
-      process.stdin.pause();
-      process.stdin.unref();
     };
 
     if (process.stdin.isTTY) {
       process.stdin.setRawMode(true);
     }
+    process.stdin.ref();
     process.stdin.resume();
     process.stdin.on('data', onData);
   });
@@ -201,13 +200,12 @@ export async function confirm(uiInstance: UIInstance, question: string): Promise
         process.stdin.setRawMode(false);
       }
       process.stdin.off('data', onData);
-      process.stdin.pause();
-      process.stdin.unref();
     };
 
     if (process.stdin.isTTY) {
       process.stdin.setRawMode(true);
     }
+    process.stdin.ref();
     process.stdin.resume();
     process.stdin.on('data', onData);
   });

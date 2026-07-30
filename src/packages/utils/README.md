@@ -11,7 +11,7 @@ This package contains low-level helpers used across all package directories for 
 | File | Export / Item | Type | Description |
 | :--- | :--- | :--- | :--- |
 | `index.ts` | All helpers | Export | Bundles and exposes utility modules. |
-| `helpMsg.ts` | `show_help` | Function | Prints usage guidance, parameter flags, and configuration examples to the console when `cowork -h` or `cowork --help` is requested. |
+| `helpMsg.ts` | `show_help` | Function | Prints usage guidance, parameter flags, and configuration examples to the console when `haiku -h` or `haiku --help` is requested. |
 | `logger.ts` | `logger` | Object | Exposes print wrappers (`main`, `secondary`, `error`). |
 | | `formatMain` | Function | Styles text using green colors. |
 | | `formatSecondary`| Function | Styles text using yellow colors. |

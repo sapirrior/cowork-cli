@@ -126,9 +126,17 @@ export default class TerminalEngine {
       }
     };
 
-    // Restore terminal cursor visibility and flush history to primary screen on exit
+    // Restore terminal cursor visibility synchronously on exit if unhandled
     process.on('exit', () => {
-      this.flushHistoryToPrimaryScreen();
+      this.showCursor();
+      if (this.inAlternateScreen) {
+        process.stdout.write('\x1b[?1007l\x1b[?1006l\x1b[?1002l\x1b[?1000l\x1b[?1049l');
+        this.inAlternateScreen = false;
+        const lines = this.history.getAllLines();
+        for (const line of lines) {
+          process.stdout.write(line + '\n');
+        }
+      }
     });
   }
 
@@ -171,9 +179,10 @@ export default class TerminalEngine {
   }
 
   /**
-   * Exits Alternate Screen Buffer (\x1b[?1049l) and flushes full execution history cleanly to primary terminal scrollback.
+   * Asynchronously exits Alternate Screen Buffer (\x1b[?1049l), flushes full execution history cleanly to primary terminal scrollback,
+   * and waits for stdout stream drain before returning.
    */
-  flushHistoryToPrimaryScreen(): void {
+  async flushHistoryToPrimaryScreen(): Promise<void> {
     this.showCursor();
     if (this.inAlternateScreen) {
       process.stdout.write('\x1b[?1007l\x1b[?1006l\x1b[?1002l\x1b[?1000l\x1b[?1049l');
@@ -186,10 +195,23 @@ export default class TerminalEngine {
         this.resizeTimer = null;
       }
       process.stdout.off('resize', this.resizeHandler);
+
       const lines = this.history.getAllLines();
       for (const line of lines) {
         process.stdout.write(line + '\n');
       }
+
+      // Asynchronous stdout drain delay to guarantee terminal emulator receives and renders all flushed lines
+      await new Promise<void>((resolve) => {
+        const canWrite = process.stdout.write('');
+        if (canWrite) {
+          setTimeout(resolve, 60);
+        } else {
+          process.stdout.once('drain', () => {
+            setTimeout(resolve, 60);
+          });
+        }
+      });
     }
   }
 

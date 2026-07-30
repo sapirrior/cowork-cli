@@ -60,9 +60,18 @@ export const formatError     = (text: string): string => `${colors.error}${text}
 export const formatDim       = (text: string): string => `${colors.dim}${text}${reset}`;
 export const formatHeader    = (text: string): string => `${colors.header}${text}${reset}`;
 
+function writeLog(text: string): void {
+  const tuiLog = (globalThis as any).__tui_log;
+  if (typeof tuiLog === 'function') {
+    tuiLog(text);
+  } else {
+    console.log(text);
+  }
+}
+
 export const logger = {
-  main:      (msg: string): void => console.log(formatMain(msg)),
-  secondary: (msg: string): void => console.log(formatSecondary(msg)),
-  normal:    (msg: string): void => console.log(formatNormal(msg)),
-  error:     (msg: string): void => console.error(formatError(msg)),
+  main:      (msg: string): void => writeLog(formatMain(msg)),
+  secondary: (msg: string): void => writeLog(formatSecondary(msg)),
+  normal:    (msg: string): void => writeLog(formatNormal(msg)),
+  error:     (msg: string): void => writeLog(formatError(msg)),
 };

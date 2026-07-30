@@ -52,10 +52,12 @@ class UIEngine {
     return prompt.confirm(this, question);
   }
 
-  cleanup(): void {
+  async cleanup(): Promise<void> {
     this._abortActiveSpinner();
+    await this.engine.flushHistoryToPrimaryScreen();
   }
 }
 
 export const ui = new UIEngine();
+(globalThis as any).__tui_log = (text: string) => ui.log(text);
 export type { UIEngine };

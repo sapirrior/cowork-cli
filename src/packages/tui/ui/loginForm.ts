@@ -86,13 +86,12 @@ export async function selectProvider(uiInstance: UIInstance, items: SelectorItem
         process.stdin.setRawMode(false);
       }
       process.stdin.off('data', onData);
-      process.stdin.pause();
-      process.stdin.unref();
     };
 
     if (process.stdin.isTTY) {
       process.stdin.setRawMode(true);
     }
+    process.stdin.ref();
     process.stdin.resume();
     process.stdin.on('data', onData);
   });
@@ -238,13 +237,12 @@ export async function inputField(
         process.stdin.setRawMode(false);
       }
       process.stdin.off('data', onData);
-      process.stdin.pause();
-      process.stdin.unref();
     };
 
     if (process.stdin.isTTY) {
       process.stdin.setRawMode(true);
     }
+    process.stdin.ref();
     process.stdin.resume();
     process.stdin.on('data', onData);
   });
