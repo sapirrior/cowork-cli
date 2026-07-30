@@ -6,3 +6,4 @@ tmp/
 .antigravitycli/
 test.js
 package-lock.json
+./plan.md

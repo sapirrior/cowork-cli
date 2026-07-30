@@ -53,7 +53,9 @@ git diff | haiku "Write a clean commit message for these changes"
 ## ✨ Features That Matter
 
 * **🔌 Universal Compatibility**: Seamless support for OpenAI, local models (Ollama/Llama), OpenRouter, and dedicated handlers for **Google Gemini** (preserving thought metadata).
-* **🖥️ Zero-Whitespace UI**: Clean, high-density terminal layouts designed for developers.
+* **🖥️ State-Driven TUI Engine**: Zero-flicker rendering powered by a `DocumentTree` state model operating inside the Alternate Screen Buffer (`\x1b[?1049h`).
+* **🖱️ Natural Trackpad Scrolling & Keybindings**: Full mouse wheel scroll support (`\x1b[?1007h`), trackpad gestures, `PageUp`/`PageDown`, `Home`/`End`, and `↑`/`↓` Arrow keys.
+* **🔍 Dynamic Terminal Zooming**: Resizing or zooming font size (`Ctrl+`/`Ctrl-`) reflows text line-wrapping instantly with zero ghost lines or scrollback corruption.
 * **🎨 Markdown Rendering**: Custom TUI compiler rendering headings, lists, tables, bold styling, and blockquotes with full CJK character width support.
 * **🔧 Powerful Tool Suite**:
   * `searchText` (Regex searches with context window lines)

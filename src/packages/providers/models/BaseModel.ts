@@ -133,10 +133,7 @@ export default class BaseModel {
           ui.stop(); // Stop thinking spinner with green dot (Thought)
           if (message.content) {
             const formatted = outputFormatted(message.content);
-            process.stdout.write(formatted);
-            if (!formatted.endsWith('\n')) {
-              process.stdout.write("\n");
-            }
+            ui.log(formatted);
           }
           this._printStats();
           return;

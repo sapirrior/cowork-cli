@@ -32,8 +32,10 @@ export async function ask(uiInstance: UIInstance, question: string): Promise<str
         const yellowColor: [number, number, number] = [242, 207, 110];
         const silverColor: [number, number, number] = [194, 198, 197];
         const redColor: [number, number, number] = [224, 112, 112];
-        process.stdout.write(`${rgb(blueColor, '◇')} ${rgb(yellowColor, 'Ask:')} ${rgb(silverColor, question)}\n`);
-        process.stdout.write(`${rgb(blueColor, '➔')} ${rgb(redColor, 'cancelled')}\n`);
+        uiInstance.engine.commit('raw', [
+          `${rgb(blueColor, '◇')} ${rgb(yellowColor, 'Ask:')} ${rgb(silverColor, question)}`,
+          `${rgb(blueColor, '➔')} ${rgb(redColor, 'cancelled')}`
+        ]);
         reject({ cancelled: true });
         return;
       }
@@ -87,8 +89,10 @@ export async function ask(uiInstance: UIInstance, question: string): Promise<str
         const blueColor: [number, number, number] = [123, 165, 218];
         const yellowColor: [number, number, number] = [242, 207, 110];
         const silverColor: [number, number, number] = [194, 198, 197];
-        process.stdout.write(`${rgb(blueColor, '◇')} ${rgb(yellowColor, 'Ask:')} ${rgb(silverColor, question)}\n`);
-        process.stdout.write(`${rgb(blueColor, '➔')}  ${buffer}\n`);
+        uiInstance.engine.commit('raw', [
+          `${rgb(blueColor, '◇')} ${rgb(yellowColor, 'Ask:')} ${rgb(silverColor, question)}`,
+          `${rgb(blueColor, '➔')}  ${buffer}`
+        ]);
         resolve(buffer.trim());
         return;
       }
@@ -113,6 +117,7 @@ export async function ask(uiInstance: UIInstance, question: string): Promise<str
       }
       process.stdin.off('data', onData);
       process.stdin.pause();
+      process.stdin.unref();
     };
 
     if (process.stdin.isTTY) {
@@ -156,8 +161,10 @@ export async function confirm(uiInstance: UIInstance, question: string): Promise
         uiInstance.engine.unmountAll();
         const yellowColor: [number, number, number] = [242, 207, 110];
         const silverColor: [number, number, number] = [194, 198, 197];
-        process.stdout.write(`${rgb(blueColor, '◇')} ${rgb(yellowColor, 'Ask Confirm:')} ${rgb(silverColor, question)}\n`);
-        process.stdout.write(`${rgb(blueColor, '➔')} ${dim('cancelled')}\n`);
+        uiInstance.engine.commit('raw', [
+          `${rgb(blueColor, '◇')} ${rgb(yellowColor, 'Ask Confirm:')} ${rgb(silverColor, question)}`,
+          `${rgb(blueColor, '➔')} ${dim('cancelled')}`
+        ]);
         resolve({ confirmed: false, dismissed: true });
         return;
       }
@@ -169,8 +176,10 @@ export async function confirm(uiInstance: UIInstance, question: string): Promise
         const silverColor: [number, number, number] = [194, 198, 197];
         const finalColor: [number, number, number] = selectedYes ? [122, 195, 145] : [224, 112, 112];
         const finalStr = selectedYes ? 'yes' : 'no';
-        process.stdout.write(`${rgb(blueColor, '◇')} ${rgb(yellowColor, 'Ask Confirm:')} ${rgb(silverColor, question)}\n`);
-        process.stdout.write(`${rgb(blueColor, '➔')} ${rgb(finalColor, finalStr)}\n`);
+        uiInstance.engine.commit('raw', [
+          `${rgb(blueColor, '◇')} ${rgb(yellowColor, 'Ask Confirm:')} ${rgb(silverColor, question)}`,
+          `${rgb(blueColor, '➔')} ${rgb(finalColor, finalStr)}`
+        ]);
         resolve({ confirmed: selectedYes });
         return;
       }
@@ -193,6 +202,7 @@ export async function confirm(uiInstance: UIInstance, question: string): Promise
       }
       process.stdin.off('data', onData);
       process.stdin.pause();
+      process.stdin.unref();
     };
 
     if (process.stdin.isTTY) {

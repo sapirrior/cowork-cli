@@ -46,6 +46,7 @@
     "string-width": "^7.1.0"
   },
   "devDependencies": {
-    "@types/node": "^25.9.3"
+    "@types/node": "^25.9.3",
+    "typescript": "^7.0.2"
   }
 }

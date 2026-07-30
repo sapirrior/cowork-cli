@@ -48,8 +48,10 @@ export async function selectProvider(uiInstance: UIInstance, items: SelectorItem
         cleanup();
         uiInstance.engine.unmountAll();
         
-        process.stdout.write(`${THEME.formatMain('◇')} ${THEME.formatDim('haiku login')}\n`);
-        process.stdout.write(`${THEME.formatMain('➔')} ${THEME.formatError('cancelled')}\n`);
+        uiInstance.engine.commit('log', [
+          `${THEME.formatMain('◇')} ${THEME.formatDim('haiku login')}`,
+          `${THEME.formatMain('➔')} ${THEME.formatError('cancelled')}`
+        ]);
         
         reject({ cancelled: true });
         return;
@@ -61,8 +63,10 @@ export async function selectProvider(uiInstance: UIInstance, items: SelectorItem
         
         const selectedItem = items[selectedIdx];
         
-        process.stdout.write(`${THEME.formatMain('◇')} ${THEME.formatDim('haiku login')}\n`);
-        process.stdout.write(`${THEME.formatMain('➔')} ${THEME.formatSuccess(`Selected: ${selectedItem.label}`)}\n`);
+        uiInstance.engine.commit('log', [
+          `${THEME.formatMain('◇')} ${THEME.formatDim('haiku login')}`,
+          `${THEME.formatMain('➔')} ${THEME.formatSuccess(`Selected: ${selectedItem.label}`)}`
+        ]);
         
         resolve(selectedIdx);
         return;
@@ -83,6 +87,7 @@ export async function selectProvider(uiInstance: UIInstance, items: SelectorItem
       }
       process.stdin.off('data', onData);
       process.stdin.pause();
+      process.stdin.unref();
     };
 
     if (process.stdin.isTTY) {
@@ -139,8 +144,10 @@ export async function inputField(
         cleanup();
         uiInstance.engine.unmountAll();
         
-        process.stdout.write(`${THEME.formatMain('◈')} ${THEME.formatNormal(label)}${hint ? ' ' + THEME.formatDim(hint) : ''}\n`);
-        process.stdout.write(`${THEME.formatMain('➔')} ${THEME.formatError('cancelled')}\n`);
+        uiInstance.engine.commit('log', [
+          `${THEME.formatMain('◈')} ${THEME.formatNormal(label)}${hint ? ' ' + THEME.formatDim(hint) : ''}`,
+          `${THEME.formatMain('➔')} ${THEME.formatError('cancelled')}`
+        ]);
         
         reject({ cancelled: true });
         return;
@@ -203,8 +210,10 @@ export async function inputField(
         const resolvedVal = finalVal || fallback;
         const displayVal = masked ? '•'.repeat(resolvedVal.length) : resolvedVal;
 
-        process.stdout.write(`${THEME.formatMain('◈')} ${THEME.formatNormal(label)}${hint ? ' ' + THEME.formatDim(hint) : ''}\n`);
-        process.stdout.write(`${THEME.formatMain('➔')} ${THEME.formatSuccess(displayVal)}\n`);
+        uiInstance.engine.commit('log', [
+          `${THEME.formatMain('◈')} ${THEME.formatNormal(label)}${hint ? ' ' + THEME.formatDim(hint) : ''}`,
+          `${THEME.formatMain('➔')} ${THEME.formatSuccess(displayVal)}`
+        ]);
         
         resolve(resolvedVal);
         return;
@@ -230,6 +239,7 @@ export async function inputField(
       }
       process.stdin.off('data', onData);
       process.stdin.pause();
+      process.stdin.unref();
     };
 
     if (process.stdin.isTTY) {

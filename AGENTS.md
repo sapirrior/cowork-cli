@@ -46,7 +46,7 @@ To maintain system compatibility and stability, you **must** adhere to these rul
 
 ### 3. Terminal UI Safety
 *   **No Unbounded Prints**: Never use standard `console.log()` or `process.stdout.write()` while a TUI spinner or selector is active.
-*   **Logger Abstraction**: Always write messages through the `ui.log()` API in **[main.ts](./src/packages/tui/ui/main.ts)**, which clears active visual components, prints the output, and redraws components cleanly.
+*   **Logger Abstraction & Persistence**: Always write messages through the `ui.log()` API in **[main.ts](./src/packages/tui/ui/main.ts)** (or call `engine.commit()`). This ensures the printed output is persisted inside the `HistoryStore` state, preventing it from being lost during terminal resize events. Never write user-visible output directly to standard streams.
 
 ### 4. Package Documentation Invariant
 *   **Update Package READMEs**: Whenever you modify code or files within any package directory (e.g., inside `src/packages/`), you **must** update the corresponding package's `README.md` file to accurately reflect the changes (e.g., updated exported APIs, functions, arguments, models, or schemas).

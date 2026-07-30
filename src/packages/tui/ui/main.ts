@@ -26,14 +26,11 @@ class UIEngine {
   _commitSpinner(msg: string | undefined, color: [number, number, number]): void { spinner.commitSpinner(this, msg, color); }
 
   log(text: string): void {
-    const hasActiveComponents = this.engine.components.length > 0;
-    if (hasActiveComponents) {
-      this.engine.clear();
-      process.stdout.write(text + '\n');
-      this.engine.render();
-    } else {
-      process.stdout.write(text + '\n');
+    const lines = text.split('\n');
+    if (lines.length > 1 && lines[lines.length - 1] === '') {
+      lines.pop();
     }
+    this.engine.commit('log', lines);
   }
 
   header(title: string): void {

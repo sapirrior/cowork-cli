@@ -86,7 +86,10 @@ Zero TypeScript errors is the bar. `tsc --strict` mode is enforced.
      │        tools/*.ts        ← Individual tool implementations (readFile, searchText, webFetch…)
      │
      └──► [src/packages/tui/]
-              engine/TerminalEngine.ts  ← Differential rendering loop with synchronized output
+              engine/DocumentTree.ts   ← Manages ordered tree of component nodes
+              engine/FrameBuffer.ts    ← Computes DocumentFrame, viewport slicing, & scroll bounds
+              engine/StateRenderer.ts  ← Atomic frame replacement (clear & paint \x1b[H\x1b[J)
+              engine/TerminalEngine.ts ← Alternate Screen manager, resize debouncing, mouse tracking, & history flush
               ui/main.ts               ← UIEngine facade (start/stop/log/ask/confirm)
               theme.ts                 ← Centralized color theme from config.json
 ```

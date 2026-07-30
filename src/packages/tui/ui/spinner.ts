@@ -51,7 +51,8 @@ export function commitSpinner(uiInstance: UIInstance, msg: string | undefined, c
 
   const blueColor: [number, number, number] = [123, 165, 218];
   const dataStr = data ? ` ${rgb(blueColor, '(')}${rgb([194, 198, 197], data)}${rgb(blueColor, ')')}` : '';
-  process.stdout.write(`${rgb(color, '●')} ${rgb([242, 207, 110], label)}${dataStr}\n`);
+  
+  uiInstance.engine.commit('tool-result', [`${rgb(color, '●')} ${rgb([242, 207, 110], label)}${dataStr}`]);
 
   uiInstance.spinnerComponent = null;
 }

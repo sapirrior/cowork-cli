@@ -1,83 +1,196 @@
-import stringWidth from 'string-width';
 import Component from './Component.js';
+import HistoryStore from './HistoryStore.js';
+import StateRenderer from './StateRenderer.js';
+import { DocumentTree, ComponentNode } from './DocumentTree.js';
+import stringWidth from 'string-width';
 
-/**
- * Helper to calculate visible width of a string containing ANSI escape codes, CJK, or Emojis.
- */
-function getStringWidth(str: string): number {
-  return stringWidth(str);
-}
+class ComponentNodeAdapter implements ComponentNode {
+  id: string;
+  kind: 'spinner' | 'input' | 'select' | 'custom' = 'custom';
+  comp: Component;
 
-/**
- * Calculates the exact 0-indexed visual row where the cursor resides in the wrapping layout.
- */
-function getVisualRowOfCursor(buffer: string[], cursorLine: number, cursorColumn: number, termWidth: number): number {
-  let visualRow = 0;
-  for (let i = 0; i < cursorLine; i++) {
-    const line = buffer[i] || '';
-    const visualWidth = getStringWidth(line);
-    visualRow += Math.max(1, Math.ceil(visualWidth / termWidth));
+  constructor(id: string, comp: Component) {
+    this.id = id;
+    this.comp = comp;
   }
-  const colIndex = Math.max(0, cursorColumn - 1);
-  visualRow += Math.floor(colIndex / termWidth);
-  return visualRow;
+
+  getLines(width: number, forceAll?: boolean): string[] {
+    return this.comp._getLines(forceAll);
+  }
+
+  getCursorPosition(): { line: number; column: number } | null {
+    if (typeof this.comp.getCursorPosition === 'function') {
+      return this.comp.getCursorPosition();
+    }
+    return null;
+  }
+
+  onMount(): void {
+    if (typeof this.comp.onMount === 'function') {
+      this.comp.onMount();
+    }
+  }
+
+  onUnmount(): void {
+    if (typeof this.comp.onUnmount === 'function') {
+      this.comp.onUnmount();
+    }
+  }
+
+  onResize(width: number, height: number): void {
+    if (typeof this.comp.onResize === 'function') {
+      this.comp.onResize(width, height);
+    }
+  }
 }
 
-/**
- * TerminalEngine handles inline drawing of reactive components.
- * It manages cursor movement, frame ticking, and differential updates.
- */
 export default class TerminalEngine {
+  tree: DocumentTree;
+  history: HistoryStore;
   components: Component[];
-  previousBuffer: string[];
-  previousWidth: number;
-  previousHeight: number;
+  private adapters: Map<Component, ComponentNodeAdapter>;
+  private renderer: StateRenderer;
   dirty: boolean;
-  active: boolean;
   cursorHidden: boolean;
-  previousCursor: { line: number; column: number } | null;
-  previousCursorLine: number | undefined;
+  inAlternateScreen: boolean;
+  scrollOffset: number;
   private resizeHandler: () => void;
-  private _syncActive = false;
-
-  private _beginSync(): string {
-    if (this._syncActive) return '';
-    this._syncActive = true;
-    return '\x1b[?2026h';
-  }
-
-  private _endSync(): string {
-    if (!this._syncActive) return '';
-    this._syncActive = false;
-    return '\x1b[?2026l';
-  }
+  private inputHandler: (data: Buffer) => void;
+  private resizeTimer: NodeJS.Timeout | null = null;
+  private idCounter = 0;
 
   constructor() {
+    this.tree = new DocumentTree();
+    this.history = new HistoryStore();
     this.components = [];
-    this.previousBuffer = [];
-    this.previousWidth = process.stdout.columns || 80;
-    this.previousHeight = process.stdout.rows || 24;
+    this.adapters = new Map();
+    this.renderer = new StateRenderer();
     this.dirty = false;
-    this.active = false;
     this.cursorHidden = false;
-    this.previousCursor = null;
-    this.previousCursorLine = undefined;
+    this.inAlternateScreen = false;
+    this.scrollOffset = 0;
 
+    // Window resize & zoom handler: debounced for smooth reflow
     this.resizeHandler = () => {
-      const w = process.stdout.columns || 80;
-      const h = process.stdout.rows || 24;
-      for (const comp of this.components) {
-        if (typeof comp.onResize === 'function') {
-          comp.onResize(w, h);
-        }
+      if (this.resizeTimer) {
+        clearTimeout(this.resizeTimer);
       }
-      this.requestFrame();
+      this.resizeTimer = setTimeout(() => {
+        const w = process.stdout.columns || 80;
+        const h = process.stdout.rows || 24;
+        for (const comp of this.components) {
+          if (typeof comp.onResize === 'function') {
+            comp.onResize(w, h);
+          }
+        }
+        this.requestFrame(true);
+      }, 50);
     };
 
-    // Restore terminal cursor visibility on exit
+    // Input handler for scroll events & arrow navigation in Alternate Screen mode
+    this.inputHandler = (data: Buffer) => {
+      if (!this.inAlternateScreen) return;
+      const str = data.toString();
+
+      // Check if an interactive input component is handling keyboard navigation
+      const hasInteractiveComponent = this.components.some(c => typeof (c as any).handleInput === 'function');
+
+      if (!hasInteractiveComponent) {
+        // Up Arrow key: scroll up 1 line
+        if (str === '\x1b[A') {
+          this.scrollUp(1);
+          return;
+        }
+        // Down Arrow key: scroll down 1 line
+        if (str === '\x1b[B') {
+          this.scrollDown(1);
+          return;
+        }
+      }
+
+      // Mouse wheel scroll up / PageUp: \x1b[<64; or \x1b[5~
+      if (str.includes('\x1b[<64;') || str.includes('\x1b[5~')) {
+        this.scrollUp(3);
+      }
+      // Mouse wheel scroll down / PageDown: \x1b[<65; or \x1b[6~
+      else if (str.includes('\x1b[<65;') || str.includes('\x1b[6~')) {
+        this.scrollDown(3);
+      }
+      // Home key (scroll to top): \x1b[1~
+      else if (str.includes('\x1b[1~')) {
+        this.scrollUp(999999);
+      }
+      // End key (scroll to bottom): \x1b[4~
+      else if (str.includes('\x1b[4~')) {
+        this.scrollToBottom();
+      }
+    };
+
+    // Restore terminal cursor visibility and flush history to primary screen on exit
     process.on('exit', () => {
-      this.showCursor();
+      this.flushHistoryToPrimaryScreen();
     });
+  }
+
+  /**
+   * Scroll up into historical lines in Alternate Screen view.
+   */
+  scrollUp(amount: number = 3): void {
+    this.scrollOffset += amount;
+    this.requestFrame();
+  }
+
+  /**
+   * Scroll down towards recent lines in Alternate Screen view.
+   */
+  scrollDown(amount: number = 3): void {
+    this.scrollOffset = Math.max(0, this.scrollOffset - amount);
+    this.requestFrame();
+  }
+
+  /**
+   * Reset scroll position to bottom (most recent content).
+   */
+  scrollToBottom(): void {
+    this.scrollOffset = 0;
+    this.requestFrame();
+  }
+
+  /**
+   * Enters Alternate Screen Buffer (\x1b[?1049h) with SGR mouse tracking & xterm Alternate Scroll (\x1b[?1007h) enabled.
+   */
+  ensureAlternateScreen(): void {
+    if (!this.inAlternateScreen) {
+      process.stdout.write('\x1b[?1049h\x1b[H\x1b[?1000h\x1b[?1002h\x1b[?1006h\x1b[?1007h');
+      this.inAlternateScreen = true;
+      if (process.stdin.isTTY) {
+        process.stdin.on('data', this.inputHandler);
+      }
+      process.stdout.on('resize', this.resizeHandler);
+    }
+  }
+
+  /**
+   * Exits Alternate Screen Buffer (\x1b[?1049l) and flushes full execution history cleanly to primary terminal scrollback.
+   */
+  flushHistoryToPrimaryScreen(): void {
+    this.showCursor();
+    if (this.inAlternateScreen) {
+      process.stdout.write('\x1b[?1007l\x1b[?1006l\x1b[?1002l\x1b[?1000l\x1b[?1049l');
+      this.inAlternateScreen = false;
+      if (process.stdin.isTTY) {
+        process.stdin.off('data', this.inputHandler);
+      }
+      if (this.resizeTimer) {
+        clearTimeout(this.resizeTimer);
+        this.resizeTimer = null;
+      }
+      process.stdout.off('resize', this.resizeHandler);
+      const lines = this.history.getAllLines();
+      for (const line of lines) {
+        process.stdout.write(line + '\n');
+      }
+    }
   }
 
   /**
@@ -101,234 +214,88 @@ export default class TerminalEngine {
   }
 
   /**
-   * Mounts a component to the engine layout.
+   * Commit static content to DocumentTree history and schedule a frame render.
+   */
+  commit(kind: 'log' | 'header' | 'footer' | 'tool-result' | 'assistant-message' | 'raw', lines: string[]): void {
+    this.ensureAlternateScreen();
+    this.history.push(kind, lines);
+    this.tree.addText(lines);
+    this.requestFrame();
+  }
+
+  /**
+   * Mounts a component to the engine document tree.
    */
   mount(component: Component, options: { keepCursorVisible?: boolean } = {}): void {
-    if (this.components.length === 0) {
-      process.stdout.on('resize', this.resizeHandler);
-    }
+    this.ensureAlternateScreen();
     component.engine = this;
     this.components.push(component);
-    
+
+    const adapter = new ComponentNodeAdapter(`comp-${this.idCounter++}`, component);
+    this.adapters.set(component, adapter);
+    this.tree.mountNode(adapter);
+
     if (options.keepCursorVisible) {
       this.showCursor();
     } else {
       this.hideCursor();
     }
 
-    if (typeof component.onMount === 'function') {
-      component.onMount();
-    }
-
-    // Pre-scroll terminal for the initial render size
-    const initialLines = component._getLines(true);
-    const termWidth = process.stdout.columns || 80;
-    let visualRows = 0;
-    for (const line of initialLines) {
-      const visualWidth = getStringWidth(line);
-      visualRows += Math.max(1, Math.ceil(visualWidth / termWidth));
-    }
-    if (visualRows > 1) {
-      process.stdout.write('\n'.repeat(visualRows - 1) + `\x1b[${visualRows - 1}A\r`);
-    }
-    
     this.requestFrame();
   }
 
   /**
-   * Clears the current visual buffer from the screen.
+   * Unmount a specific component from DocumentTree.
    */
-  clear(): void {
-    if (this.previousBuffer.length > 0) {
-      const drawWidth = this.previousWidth || process.stdout.columns || 80;
-      const curWidth  = process.stdout.columns || 80;
-      const getVisualLineCountAt = (lines: string[], w: number): number => {
-        let count = 0;
-        for (const line of lines) {
-          count += Math.max(1, Math.ceil(getStringWidth(line) / w));
-        }
-        return count;
-      };
-      // Take the MAX across old-width and current-width so that if the terminal
-      // reflowed content into more rows we still erase all of them.
-      const prevVisualRows = Math.max(
-        getVisualLineCountAt(this.previousBuffer, drawWidth),
-        getVisualLineCountAt(this.previousBuffer, curWidth)
-      );
-      if (prevVisualRows > 0) {
-        let clearOutput = this._beginSync();
-        // On clear we always treat cursor as being at bottom of the frame.
-        const upOffset = Math.max(0, Math.min(prevVisualRows - 1, (process.stdout.rows || 24) - 1));
-        if (upOffset > 0) clearOutput += `\x1b[${upOffset}A`;
-        clearOutput += '\r\x1b[J' + this._endSync();
-        process.stdout.write(clearOutput);
-      }
-      this.previousBuffer = [];
-      this.previousCursor = null;
-      this.previousCursorLine = undefined;
+  unmount(component: Component): void {
+    const adapter = this.adapters.get(component);
+    if (adapter) {
+      this.tree.unmountNode(adapter);
+      this.adapters.delete(component);
     }
+    this.components = this.components.filter(c => c !== component);
+    this.requestFrame();
   }
 
   /**
-   * Unmounts all components and stops loop.
+   * Clears current visual buffer record.
+   */
+  clear(): void {
+    this.renderer.clearPreviousFrameRecord();
+  }
+
+  /**
+   * Unmounts all live components from DocumentTree.
    */
   unmountAll(): void {
     this.showCursor();
     for (const comp of this.components) {
-      if (typeof comp.onUnmount === 'function') {
-        comp.onUnmount();
+      const adapter = this.adapters.get(comp);
+      if (adapter) {
+        this.tree.unmountNode(adapter);
       }
     }
-    this.clear();
     this.components = [];
+    this.adapters.clear();
     this.dirty = false;
-    this.active = false;
-    this.previousCursor = null;
-    this.previousCursorLine = undefined;
-    process.stdout.off('resize', this.resizeHandler);
+    this.requestFrame();
   }
 
   /**
    * Request a redraw frame on the next tick.
    */
-  requestFrame(): void {
+  requestFrame(forceFull = false): void {
     if (this.dirty) return;
     this.dirty = true;
-    
-    // Ticker scheduling to batch updates
+
     process.nextTick(() => {
       if (this.dirty) {
-        this.render();
-      }
-    });
-  }
-
-  /**
-   * Performs differential drawing on process.stdout
-   */
-  render(forceAll: boolean = false): void {
-    this.dirty = false;
-
-    // 1. Gather next buffer lines
-    const nextBuffer: string[] = [];
-    let customCursor: { line: number; column: number } | null = null;
-    let lineOffsetAccumulator = 0;
-
-    const termWidth = process.stdout.columns || 80;
-    const termHeight = process.stdout.rows || 24;
-    const sizeChanged = termWidth !== this.previousWidth || termHeight !== this.previousHeight;
-
-    for (const comp of this.components) {
-      const compLines = comp._getLines(forceAll || sizeChanged);
-      if (comp.getCursorPosition) {
-        const pos = comp.getCursorPosition();
-        if (pos) {
-          customCursor = {
-            line: lineOffsetAccumulator + pos.line,
-            column: pos.column
-          };
+        this.dirty = false;
+        if (this.inAlternateScreen) {
+          const frame = this.renderer.render(this.tree, this.scrollOffset, forceFull);
+          this.scrollOffset = frame.currentScrollOffset;
         }
       }
-      nextBuffer.push(...compLines);
-      lineOffsetAccumulator += compLines.length;
-    }
-
-    const cursorChanged = (
-      (customCursor && (!this.previousCursor || this.previousCursor.line !== customCursor.line || this.previousCursor.column !== customCursor.column)) ||
-      (!customCursor && this.previousCursor)
-    );
-
-    // Fast-path: if nothing has changed and size hasn't changed, skip drawing
-    if (!forceAll &&
-        !sizeChanged &&
-        !cursorChanged &&
-        nextBuffer.length === this.previousBuffer.length &&
-        nextBuffer.every((line, idx) => line === this.previousBuffer[idx])) {
-      return;
-    }
-
-    // Helper to calculate wrapping rows — parameterised by width so we can
-    // measure the OLD buffer at OLD width and the NEW buffer at NEW width.
-    const getVisualLineCountAt = (lines: string[], w: number): number => {
-      let count = 0;
-      for (const line of lines) {
-        const visualWidth = getStringWidth(line);
-        count += Math.max(1, Math.ceil(visualWidth / w));
-      }
-      return count;
-    };
-
-    const drawWidth = this.previousWidth || termWidth;
-
-    // On resize the terminal emulator may have *reflowed* the previously drawn
-    // content so that it occupies a different number of physical rows than what
-    // we measured at the old width.  To guarantee we erase ALL of those rows
-    // (whether the terminal narrowed and content expanded, or widened and it
-    // contracted) we take the MAX of the row count at both widths.
-    // This is the only correct fix — there is no way to query the terminal for
-    // the actual row count after a reflow.
-    const prevVisualRowsAtOldWidth = getVisualLineCountAt(this.previousBuffer, drawWidth);
-    const prevVisualRowsAtNewWidth = getVisualLineCountAt(this.previousBuffer, termWidth);
-    const prevVisualRows = sizeChanged
-      ? Math.max(prevVisualRowsAtOldWidth, prevVisualRowsAtNewWidth)
-      : prevVisualRowsAtOldWidth;
-
-    const nextVisualRows = getVisualLineCountAt(nextBuffer, termWidth);
-
-    // Batch all ANSI movements and clears into a single write buffer string.
-    // \x1b[?2026h / \x1b[?2026l = synchronized output — terminal paints atomically.
-    let output = this._beginSync();
-
-    // If the new frame needs more physical rows, pre-scroll to reserve space.
-    if (this.previousBuffer.length > 0 && nextVisualRows > prevVisualRows) {
-      const heightIncrease = nextVisualRows - prevVisualRows;
-      output += '\n'.repeat(heightIncrease) + `\x1b[${heightIncrease}A\r`;
-    }
-
-    // Roll cursor back up to the TOP of the previously rendered frame.
-    // On resize: always treat cursor as at the very bottom of prevVisualRows
-    // because the stored previousCursor position is stale after a reflow.
-    // On normal render: use the actual stored cursor row.
-    const prevCursorVisualRow = (sizeChanged || !this.previousCursor)
-      ? (prevVisualRows - 1)
-      : getVisualRowOfCursor(this.previousBuffer, this.previousCursor.line, this.previousCursor.column, drawWidth);
-
-    if (prevVisualRows > 1) {
-      const upOffset = Math.min(prevCursorVisualRow, termHeight - 1);
-      if (upOffset > 0) output += `\x1b[${upOffset}A`;
-    }
-    output += '\r\x1b[J'; // Erase from top of our frame downward — never touches output above
-
-    // 3. Append the new buffer cleanly
-    for (let i = 0; i < nextBuffer.length; i++) {
-      const line = nextBuffer[i];
-      if (i === nextBuffer.length - 1) {
-        output += '\r' + line; // Keep cursor at the end of the last line
-      } else {
-        output += '\r' + line + '\n';
-      }
-    }
-
-    // 4. Position cursor to custom line/col if needed
-    if (customCursor) {
-      const customCursorVisualRow = getVisualRowOfCursor(nextBuffer, customCursor.line, customCursor.column, termWidth);
-      const linesFromBottom = (nextVisualRows - 1) - customCursorVisualRow;
-      if (linesFromBottom > 0) {
-        output += `\x1b[${linesFromBottom}A`;
-      }
-      const targetCol = ((customCursor.column - 1) % termWidth) + 1;
-      output += `\r\x1b[${targetCol}G`;
-    }
-
-    output += this._endSync(); // End synchronized output
-
-    // Write everything to stdout in a single write operation to prevent flicker
-    process.stdout.write(output);
-
-    this.previousBuffer = nextBuffer;
-    this.previousWidth = termWidth;
-    this.previousHeight = termHeight;
-    this.previousCursor = customCursor;
-    this.previousCursorLine = customCursor ? customCursor.line : (nextBuffer.length - 1);
+    });
   }
 }
