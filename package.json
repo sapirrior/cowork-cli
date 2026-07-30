@@ -1,6 +1,6 @@
 {
   "name": "haiku-67",
-  "version": "4.1.0",
+  "version": "5.1.0",
   "description": "Haiku — a read-only AI engineering co-worker for your terminal",
   "bin": {
     "haiku": "dist/bin/cli.js",
