@@ -1,5 +1,6 @@
 import Component from '../Component.js';
 import { rgb, bold, dim } from '../../ui/format.js';
+import { detectLanguage, highlightLine } from '../../ui/highlighter.js';
 
 export interface ToolConfirmationProps {
   toolName?: string;
@@ -25,38 +26,46 @@ const blueColor:   [number, number, number] = [123, 165, 218];
 const silverColor: [number, number, number] = [194, 198, 197];
 const greenColor:  [number, number, number] = [122, 195, 145];
 const redColor:    [number, number, number] = [224, 112, 112];
-const whiteColor:  [number, number, number] = [245, 248, 255];
 const dimColor:    [number, number, number] = [160, 165, 175];
 
 /**
  * Preview line formatter:
- * - Additions (+): Green
- * - Deletions / Minus lines (-): Red
- * - Shell commands ($): Bold Gold + White
- * - Base Code: Clean White (no syntax highlighting)
+ * - Additions (+): Green marker + syntax highlighted code
+ * - Deletions / Minus lines (-): Red marker + syntax highlighted code
+ * - Shell commands ($): Bold Gold $ + bash highlighted command
+ * - Base Code: Syntax highlighted based on file language
  */
-function formatPreviewLine(line: string): string {
+function formatPreviewLine(line: string, language: string): string {
   if (!line) return '';
 
   const trimmed = line.trim();
 
-  // 1. Edit diff additions (+ ...) -> Green
-  if (trimmed.startsWith('+')) {
-    return rgb(greenColor, line);
+  // 1. Edit diff additions (+ ...) -> Green marker + highlighted code
+  if (line.startsWith('+')) {
+    const spaceCode = line.slice(1);
+    const spaceMatch = spaceCode.match(/^(\s*)(.*)$/);
+    const space = spaceMatch ? spaceMatch[1] : '';
+    const code = spaceMatch ? spaceMatch[2] : '';
+    return rgb(greenColor, '+') + space + highlightLine(code, language);
   }
 
-  // 2. Edit diff deletions / minus lines (- ...) -> Red
-  if (trimmed.startsWith('-')) {
-    return rgb(redColor, line);
+  // 2. Edit diff deletions / minus lines (- ...) -> Red marker + highlighted code
+  if (line.startsWith('-')) {
+    const spaceCode = line.slice(1);
+    const spaceMatch = spaceCode.match(/^(\s*)(.*)$/);
+    const space = spaceMatch ? spaceMatch[1] : '';
+    const code = spaceMatch ? spaceMatch[2] : '';
+    return rgb(redColor, '-') + space + highlightLine(code, language);
   }
 
-  // 3. Shell commands ($ ...)
+  // 3. Shell commands ($ ...) -> Gold $ + bash highlighted code
   if (trimmed.startsWith('$')) {
-    return bold(rgb(amberColor, '$ ')) + bold(rgb(whiteColor, trimmed.slice(2)));
+    const code = trimmed.slice(1).trim();
+    return bold(rgb(amberColor, '$ ')) + highlightLine(code, 'bash');
   }
 
-  // Base code lines: Clean White
-  return rgb(whiteColor, line);
+  // Base code lines: syntax highlighted with the detected language
+  return highlightLine(line, language);
 }
 
 /**
@@ -98,13 +107,14 @@ export default class ToolConfirmationCard extends Component<ToolConfirmationProp
 
     // Content preview section framed by a bright Yellow vertical left border (│) with clean white content
     const yellowBar = rgb(amberColor, '│');
+    const language = detectLanguage(target, details);
 
     if (details && details.length > 0) {
       if (expanded) {
         const previewLimit = 8;
         const visibleDetails = details.slice(0, previewLimit);
         for (const line of visibleDetails) {
-          lines.push(`  ${yellowBar} ${formatPreviewLine(line)}`);
+          lines.push(`  ${yellowBar} ${formatPreviewLine(line, language)}`);
         }
         if (details.length > previewLimit) {
           lines.push(`  ${yellowBar} ${rgb(silverColor, `... (${details.length - previewLimit} more lines)`)}`);
