@@ -1,5 +1,6 @@
 import Spinner from '../engine/components/Spinner.js';
 import { rgb } from './format.js';
+import { THEME } from '../theme.js';
 
 export interface UIInstance {
   engine: any;
@@ -27,16 +28,20 @@ export function update(uiInstance: UIInstance, data: string): void {
 }
 
 export function stop(uiInstance: UIInstance, msg?: string): void {
-  commitSpinner(uiInstance, msg, [122, 195, 145]);
+  commitSpinner(uiInstance, msg, THEME.success);
 }
 
 export function fail(uiInstance: UIInstance, msg?: string): void {
-  commitSpinner(uiInstance, msg, [224, 112, 112]);
+  commitSpinner(uiInstance, msg, THEME.error);
 }
 
+/**
+ * Unmounts only the active spinner component \u2014 never calls unmountAll().
+ * Cursor visibility is managed explicitly by the caller via keepCursorVisible.
+ */
 export function abortActiveSpinner(uiInstance: UIInstance): void {
   if (uiInstance.spinnerComponent) {
-    uiInstance.engine.unmountAll();
+    uiInstance.engine.unmount(uiInstance.spinnerComponent);
     uiInstance.spinnerComponent = null;
   }
 }
@@ -47,12 +52,13 @@ export function commitSpinner(uiInstance: UIInstance, msg: string | undefined, c
   const label = uiInstance.spinnerComponent.state.label === 'Thinking...' ? 'Thought' : uiInstance.spinnerComponent.state.label;
   const data = msg !== undefined ? msg : uiInstance.spinnerComponent.state.data;
 
-  uiInstance.engine.unmountAll();
-
-  const blueColor: [number, number, number] = [123, 165, 218];
-  const dataStr = data ? ` ${rgb(blueColor, '(')}${rgb([194, 198, 197], data)}${rgb(blueColor, ')')}` : '';
-  
-  uiInstance.engine.commit('tool-result', [`${rgb(color, '●')} ${rgb([242, 207, 110], label)}${dataStr}`]);
-
+  // Null out the reference first to prevent re-entrant checks seeing stale state,
+  // then unmount the specific component \u2014 not everything on the tree.
+  const spinner = uiInstance.spinnerComponent;
   uiInstance.spinnerComponent = null;
+  uiInstance.engine.unmount(spinner);
+
+  const dataStr = data ? ` ${rgb(THEME.main, '(')}${rgb(THEME.data, data)}${rgb(THEME.main, ')')}` : '';
+
+  uiInstance.engine.commit('tool-result', [`${rgb(color, '\u25cf')} ${rgb(THEME.tool, label)}${dataStr}`]);
 }

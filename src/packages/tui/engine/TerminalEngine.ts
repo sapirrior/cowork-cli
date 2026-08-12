@@ -83,6 +83,14 @@ export default class TerminalEngine {
             comp.onResize(w, h);
           }
         }
+        // After a resize, content re-wraps at the new width, invalidating any
+        // raw-row scroll offset. Clamp to bottom (offset=0) so the user always
+        // sees the most recent content rather than a stale offset pointing into
+        // nothing. If the user was scrolled up intentionally, they lose position,
+        // but that is far better than history appearing to vanish.
+        if (this.scrollOffset > 0) {
+          this.scrollOffset = 0;
+        }
         this.requestFrame(true);
       }, 50);
     };
@@ -132,7 +140,7 @@ export default class TerminalEngine {
       if (this.inAlternateScreen) {
         process.stdout.write('\x1b[?1007l\x1b[?1006l\x1b[?1002l\x1b[?1000l\x1b[?1049l');
         this.inAlternateScreen = false;
-        const lines = this.history.getAllLines();
+        const lines = this.history.getPrimaryScreenLines();
         for (const line of lines) {
           process.stdout.write(line + '\n');
         }
@@ -196,7 +204,7 @@ export default class TerminalEngine {
       }
       process.stdout.off('resize', this.resizeHandler);
 
-      const lines = this.history.getAllLines();
+      const lines = this.history.getPrimaryScreenLines();
       for (const line of lines) {
         process.stdout.write(line + '\n');
       }
@@ -238,7 +246,7 @@ export default class TerminalEngine {
   /**
    * Commit static content to DocumentTree history and schedule a frame render.
    */
-  commit(kind: 'log' | 'header' | 'footer' | 'tool-result' | 'assistant-message' | 'raw', lines: string[]): void {
+  commit(kind: 'log' | 'header' | 'footer' | 'tool-result' | 'assistant-message' | 'raw' | 'logo' | 'prompt', lines: string[]): void {
     this.ensureAlternateScreen();
     this.history.push(kind, lines);
     this.tree.addText(lines);

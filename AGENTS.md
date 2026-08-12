@@ -1,12 +1,12 @@
 # 🤖 AGENTS.md — Agentic Engineering Guidelines
 
-Welcome, AI Coding Agent! This document contains machine-readable context, architectural rules, coding standards, and safety invariants for working on the `cowork-cli` codebase.
+Welcome, AI Coding Agent! This document contains machine-readable context, architectural rules, coding standards, and safety invariants for working on the `sonnet` codebase.
 
 ---
 
 ## 🎯 Executive Context
 
-`haiku-67` is an agentic command-line developer assistant. It operates a context-aware tool execution loop in standard terminal environments.
+`sonnet` is an agentic command-line developer assistant. It operates a context-aware tool execution loop in standard terminal environments.
 
 *   **Tech Stack**: Node.js, TypeScript (Strict Mode), ES Modules (`"type": "module"`), OpenAI SDK, and raw ANSI Escape Codes (no heavy terminal library dependencies).
 *   **Compilation & Runs**:
@@ -103,3 +103,15 @@ Tools are registered and schemas defined in **[tools/index.ts](./src/packages/ag
 2.  **Define Schema**: Define a strict JSON Schema representation under the `toolDefinitions` array in **[tools/index.ts](./src/packages/agent/tools/index.ts)**. Enforce `additionalProperties: false`.
 3.  **Map Implementation**: Add your tool function to the `toolImplementations` lookup object in **[tools/index.ts](./src/packages/agent/tools/index.ts)**.
 4.  **TUI Label**: Define a human-readable action description in the `TOOL_LABELS` lookup of **[BaseModel.ts](./src/packages/providers/models/BaseModel.ts)** so the TUI spinner renders cleanly.
+5.  **Interactive Classification**: If your tool mutates state or requires user confirmation, add its name to `INTERACTIVE_TOOLS` in **[tools/index.ts](./src/packages/agent/tools/index.ts)**. Never hardcode tool-name arrays in `BaseModel.ts` again.
+
+---
+
+## ⚠️ Permanent Code Invariants (Post-Audit)
+
+The following invariants were established after a comprehensive code audit. Never violate them:
+
+1. **Never push `content: null` into `messages[]`.** Always use `''` (empty string) or a real string — several OpenAI-compatible providers reject null content with 400 errors on replay.
+2. **All interactive tool routing lives in `INTERACTIVE_TOOLS` in `tools/index.ts`.** Never hardcode tool name arrays in `BaseModel.ts` or anywhere else.
+3. **`abortActiveSpinner` / `commitSpinner` must unmount only the spinner component**, never call `engine.unmountAll()`. Unmounting all components as a side effect of spinner transitions causes cursor visibility churn and can clobber active interactive prompts.
+4. **Scroll position must be clamped to 0 on terminal resize.** Raw row-count offsets are invalidated by re-wrap at a new terminal width.

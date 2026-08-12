@@ -8,11 +8,13 @@ import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
 
+
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PKG_PATH = path.join(__dirname, '../../package.json');
+const PKG_PATH = path.join(__dirname, '../../../package.json');
 
 /**
- * Main entry point for the Haiku CLI.
+ * Main entry point for the Sonnet CLI.
  * @param {string[]} args Command line arguments.
  */
 export default async function main(args: string[]): Promise<void> {
@@ -21,6 +23,8 @@ export default async function main(args: string[]): Promise<void> {
     await runLoginWizard(args.slice(1));
     return;
   }
+
+
 
   let pipedData = '';
   if (!process.stdin.isTTY) {
@@ -44,7 +48,7 @@ export default async function main(args: string[]): Promise<void> {
   if (args[0] === '-v' || args[0] === '--version') {
     try {
       const pkg = JSON.parse(fs.readFileSync(PKG_PATH, 'utf8'));
-      console.log(`haiku version ${pkg.version}`);
+      process.stdout.write(`sonnet version ${pkg.version}\n`);
     } catch (e) {
       logger.error("Error reading version from package.json");
     }

@@ -54,11 +54,15 @@ export default class Spinner extends Component<SpinnerProps, SpinnerState> {
     }, 100);
   }
 
-  override componentWillUnmount(): void {
+  override onUnmount(): void {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
     }
+  }
+
+  override componentWillUnmount(): void {
+    this.onUnmount();
   }
 
   override render(): string[] {

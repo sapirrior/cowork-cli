@@ -65,7 +65,7 @@ function writeLog(text: string): void {
   if (typeof tuiLog === 'function') {
     tuiLog(text);
   } else {
-    console.log(text);
+    process.stdout.write(text + '\n');
   }
 }
 

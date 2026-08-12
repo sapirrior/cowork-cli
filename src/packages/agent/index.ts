@@ -1,8 +1,10 @@
 import runQuery from './run.js';
-import { toolDefinitions, dispatchTool } from './tools/index.js';
+import { toolDefinitions, dispatchTool, isInteractiveTool, isKnownTool } from './tools/index.js';
 
 export {
   runQuery,
   toolDefinitions,
-  dispatchTool
+  dispatchTool,
+  isInteractiveTool,
+  isKnownTool
 };

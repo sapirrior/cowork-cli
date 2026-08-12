@@ -73,6 +73,7 @@ export default class Component<Props extends Record<string, any> = any, State ex
     if (typeof this.componentWillUnmount === 'function') {
       this.componentWillUnmount();
     }
+    this.engine = null;
   }
 
   onResize(newWidth: number, newHeight: number): void {

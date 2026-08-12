@@ -1,4 +1,4 @@
-# A sub package named agent for haiku-67 for orchestrating LLM interactions, tool executions, and system loops
+# A sub package named agent for sonnet for orchestrating LLM interactions, tool executions, and system loops
 
 This package is responsible for loading system prompts, managing conversation state, determining model types, executing tool requests dispatched by the LLM, and handling error recovery.
 
@@ -39,3 +39,7 @@ Every tool has an implementation file in `tools/` and a corresponding schema in 
 | `gitLog.ts` | `gitLog` | Shows git commit history logs. | Allows listing up to 50 commits with optional `--oneline` format. |
 | `gitStatus.ts` | `gitStatus` | Exposes porcelain git working tree status. | Parses status indicators (`M`, `A`, `D`, etc.) and groups by Staged, Unstaged, and Untracked. |
 | `readManyFiles.ts` | `readManyFiles` | Walks and consolidates matching text files. | Matches include/exclude globs. Automatically skips binary files unless explicitly requested. Filters out `.gitignore` files. Safe handle close lifecycle. |
+| `writeFile.ts` | `writeFile` | Creates or overwrites a file. | Requires mandatory user confirmation. Resolves paths safely. |
+| `editFile.ts` | `editFile` | Edits an existing file via string replacement. | Shows preview of changes and requires user confirmation. |
+| `deleteFile.ts` | `deleteFile` | Permanently deletes a single file. | Cannot delete directories. Requires mandatory confirmation. |
+| `executeCommand.ts` | `executeCommand` | Executes a shell command via bash securely. | Requires user confirmation. Enforces sandbox path boundaries, security guards against dangerous commands, non-interactive environment flags, configurable timeouts (default 60s, max 300s), and head+tail log truncation. |

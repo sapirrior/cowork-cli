@@ -1,14 +1,14 @@
 {
-  "name": "haiku-67",
-  "version": "5.1.1",
-  "description": "Haiku — a read-only AI engineering co-worker for your terminal",
+  "name": "@sapirror/sonnet-cli",
+  "version": "1.0.0",
+  "description": "Sonnet — an AI coding agent for your terminal",
   "bin": {
-    "haiku": "dist/bin/cli.js",
-    "hku": "dist/bin/cli.js",
-    "hk": "dist/bin/cli.js"
+    "sonnet": "dist/bin/cli.js",
+    "snt": "dist/bin/cli.js"
   },
   "files": [
     "dist/",
+    "src/assets/",
     "README.md",
     "CONTRIBUTING.md",
     "package.json"
@@ -16,17 +16,19 @@
   "keywords": [
     "cli",
     "ai",
-    "haiku",
+    "sonnet",
     "engineering",
-    "terminal"
+    "terminal",
+    "agent",
+    "coding"
   ],
-  "homepage": "https://github.com/sapirrior/haiku-67#readme",
+  "homepage": "https://github.com/sapirrior/sonnet#readme",
   "bugs": {
-    "url": "https://github.com/sapirrior/haiku-67/issues"
+    "url": "https://github.com/sapirrior/sonnet/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sapirrior/haiku-67.git"
+    "url": "git+https://github.com/sapirrior/sonnet.git"
   },
   "license": "MIT",
   "author": "nolan stark",
@@ -34,11 +36,12 @@
   "main": "./dist/src/core/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "node $(which tsc) && cp -r src/packages/config/configs dist/src/packages/config/",
+    "build": "node_modules/.bin/tsc && cp -r src/packages/config/configs dist/src/packages/config/ && cp -r src/assets dist/src/",
     "start": "node dist/bin/cli.js",
-    "dev": "tsx bin/cli.js"
+    "dev": "tsx bin/cli.ts"
   },
   "dependencies": {
+    "cli-highlight": "^2.1.11",
     "dotenv": "^17.4.2",
     "ipaddr.js": "^2.4.0",
     "node-html-parser": "^7.1.0",

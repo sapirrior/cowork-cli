@@ -1,6 +1,6 @@
 export interface HistoryEntry {
   id: string;
-  kind: 'log' | 'header' | 'footer' | 'tool-result' | 'assistant-message' | 'raw';
+  kind: 'log' | 'header' | 'footer' | 'tool-result' | 'assistant-message' | 'raw' | 'logo' | 'prompt';
   lines: string[];
   createdAt: number;
 }
@@ -37,7 +37,18 @@ export default class HistoryStore {
     return this.entries.flatMap(e => e.lines);
   }
 
+  /**
+   * Returns lines for primary screen flush, omitting logo and prompt entries.
+   */
+  getPrimaryScreenLines(): string[] {
+    return this.entries
+      .filter(e => e.kind !== 'logo' && e.kind !== 'prompt')
+      .flatMap(e => e.lines);
+  }
+
   clearAll(): void {
     this.entries = [];
   }
+
+
 }

@@ -49,7 +49,7 @@ export async function selectProvider(uiInstance: UIInstance, items: SelectorItem
         uiInstance.engine.unmountAll();
         
         uiInstance.engine.commit('log', [
-          `${THEME.formatMain('◇')} ${THEME.formatDim('haiku login')}`,
+          `${THEME.formatMain('◇')} ${THEME.formatDim('sonnet login')}`,
           `${THEME.formatMain('➔')} ${THEME.formatError('cancelled')}`
         ]);
         
@@ -64,7 +64,7 @@ export async function selectProvider(uiInstance: UIInstance, items: SelectorItem
         const selectedItem = items[selectedIdx];
         
         uiInstance.engine.commit('log', [
-          `${THEME.formatMain('◇')} ${THEME.formatDim('haiku login')}`,
+          `${THEME.formatMain('◇')} ${THEME.formatDim('sonnet login')}`,
           `${THEME.formatMain('➔')} ${THEME.formatSuccess(`Selected: ${selectedItem.label}`)}`
         ]);
         

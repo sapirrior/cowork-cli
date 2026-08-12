@@ -6,7 +6,7 @@ import { logger } from '../utils/index.js';
 import { OpenAI } from 'openai';
 
 const CONFIG_PATH = path.join(os.homedir(), '.env');
-const AUTH_JSON_PATH = path.join(os.homedir(), '.config', 'haiku', 'auth.json');
+const AUTH_JSON_PATH = path.join(os.homedir(), '.config', 'sonnet', 'auth.json');
 
 export interface Config {
   model_name: string;
@@ -30,33 +30,32 @@ function isValidConfigObject(c: any): c is Config {
     typeof c.model_name === 'string' && c.model_name.trim() !== '' &&
     typeof c.model_url === 'string' && c.model_url.trim() !== '' &&
     typeof c.model_api_key === 'string' && c.model_api_key.trim() !== '' &&
-    typeof c.model_type === 'string' && ['openai', 'gemini'].includes(c.model_type.toLowerCase())
+    typeof c.model_type === 'string' &&
+    ['openai', 'gemini', 'ollama', 'openrouter', 'custom'].includes(c.model_type.toLowerCase())
   );
 }
 
 /**
- * Loads the user configuration from ~/.config/haiku/auth.json (or fallback ~/.env).
- * @returns {Config|null} The configuration object or null if it doesn't exist or is invalid.
+ * Loads the user configuration from ~/.config/sonnet/auth.json (or fallback ~/.env).
  */
 export const loadConfig = (): Config | null => {
-  // 1. Try reading the modern auth.json multi-provider configuration
   if (fs.existsSync(AUTH_JSON_PATH)) {
     try {
       const content = fs.readFileSync(AUTH_JSON_PATH, 'utf8');
       const authConfig: AuthConfig = JSON.parse(content);
-      
+
       if (!authConfig || typeof authConfig !== 'object') {
-        logger.error(`Error loading configuration: ~/.config/haiku/auth.json is not a valid JSON object.`);
+        logger.error(`Error loading configuration: ~/.config/sonnet/auth.json is not a valid JSON object.`);
       } else if (!authConfig.active) {
-        logger.error(`Error loading configuration: active provider is not set in ~/.config/haiku/auth.json.`);
+        logger.error(`Error loading configuration: active provider is not set in ~/.config/sonnet/auth.json.`);
       } else if (!authConfig.providers || typeof authConfig.providers !== 'object') {
-        logger.error(`Error loading configuration: providers dictionary is missing in ~/.config/haiku/auth.json.`);
+        logger.error(`Error loading configuration: providers dictionary is missing in ~/.config/sonnet/auth.json.`);
       } else {
         const activeConfig = authConfig.providers[authConfig.active];
         if (!activeConfig) {
-          logger.error(`Error loading configuration: active provider '${authConfig.active}' details are missing in ~/.config/haiku/auth.json.`);
+          logger.error(`Error loading configuration: active provider '${authConfig.active}' details are missing.`);
         } else if (!isValidConfigObject(activeConfig)) {
-          logger.error(`Error loading configuration: active provider '${authConfig.active}' config in ~/.config/haiku/auth.json is invalid or incomplete.`);
+          logger.error(`Error loading configuration: active provider '${authConfig.active}' config is invalid or incomplete.`);
         } else {
           return {
             model_name: activeConfig.model_name,
@@ -67,16 +66,16 @@ export const loadConfig = (): Config | null => {
         }
       }
     } catch (err: any) {
-      logger.error(`Error parsing ~/.config/haiku/auth.json: ${err.message}`);
+      logger.error(`Error parsing ~/.config/sonnet/auth.json: ${err.message}`);
     }
   }
 
-  // 2. Fall back to the legacy ~/.env file
+  // Fallback to legacy ~/.env
   try {
     if (fs.existsSync(CONFIG_PATH)) {
       const content = fs.readFileSync(CONFIG_PATH, 'utf8');
       const envConfig = dotenv.parse(content);
-      
+
       const config = {
         model_name: envConfig.CWK_MODEL_NAME || envConfig.MODEL_NAME,
         model_url: envConfig.CWK_MODEL_URL || envConfig.MODEL_URL,
@@ -84,7 +83,6 @@ export const loadConfig = (): Config | null => {
         model_type: envConfig.CWK_MODEL_TYPE || envConfig.MODEL_TYPE
       };
 
-      // Remove undefined/empty values
       const filteredConfig = Object.fromEntries(
         Object.entries(config).filter(([_, v]) => v !== undefined && v !== '')
       ) as Partial<Config>;
@@ -103,23 +101,12 @@ export const loadConfig = (): Config | null => {
   return null;
 };
 
-/**
- * Validates the configuration object.
- * @param {Config|null|undefined} config The configuration object to validate.
- * @returns {config is Config} True if valid, false otherwise.
- */
 export const validateConfig = (config: Config | null | undefined): config is Config => {
   return isValidConfigObject(config);
 };
 
-/**
- * Verifies the connectivity and credentials by listing models.
- * @param {OpenAI} client The initialized OpenAI client.
- * @returns {Promise<boolean>} True if connectivity is verified, false otherwise.
- */
 export const verifyConnectivity = async (client: OpenAI): Promise<boolean> => {
   try {
-    // This call verifies both the API Key and the Base URL
     await client.models.list();
     return true;
   } catch (err: any) {

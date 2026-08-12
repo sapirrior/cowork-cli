@@ -2,7 +2,7 @@
 
 /**
  * @file cli.ts
- * @description Executable entry point for the cwk CLI tool.
+ * @description Executable entry point for the Sonnet CLI tool.
  * Handles top-level error boundaries and passes execution to the main application logic.
  */
 

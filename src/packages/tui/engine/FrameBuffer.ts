@@ -22,25 +22,24 @@ export function computeDocumentFrame(
 ): DocumentFrame {
   const nodes = tree.getNodes();
   const allLines: string[] = [];
-  let cursor: DocumentFrame['cursor'] = null;
-  let lineOffset = 0;
+  let cursorLineIndex = -1;
+  let cursorColumn = 0;
 
   for (const node of nodes) {
     const nodeLines = node.getLines(termWidth, forceAll);
+    const startLineIndex = allLines.length;
+
     if (node.getCursorPosition) {
       const pos = node.getCursorPosition();
       if (pos) {
-        cursor = {
-          line: lineOffset + pos.line,
-          column: pos.column,
-        };
+        cursorLineIndex = startLineIndex + pos.line;
+        cursorColumn = pos.column;
       }
     }
     allLines.push(...nodeLines);
-    lineOffset += nodeLines.length;
   }
 
-  // Measure visual row count for every line at current termWidth (handles zooming)
+  // Measure visual row height for every line at current termWidth
   const visualRowHeights: number[] = [];
   let totalVisualRows = 0;
   for (const line of allLines) {
@@ -54,7 +53,7 @@ export function computeDocumentFrame(
   const maxScrollOffset = Math.max(0, totalVisualRows - maxRows);
   const clampedScroll = Math.max(0, Math.min(scrollOffset, maxScrollOffset));
 
-  // Slicing for scroll offset (0 = bottom-anchored most recent content)
+  // Determine viewport lines based on scroll offset
   let accumulatedRowsFromBottom = 0;
   let endIndex = allLines.length;
   let startIndex = 0;
@@ -79,14 +78,19 @@ export function computeDocumentFrame(
     viewportRows += rows;
   }
 
-  const hiddenLinesAbove = startIndex;
-  let adjustedCursor: DocumentFrame['cursor'] = null;
-  if (cursor) {
-    const effectiveLine = cursor.line - hiddenLinesAbove;
-    if (effectiveLine >= 0 && effectiveLine < viewportLines.length) {
-      adjustedCursor = { line: effectiveLine, column: cursor.column };
+  // Calculate physical screen row for cursor by summing visualRowHeights of preceding lines in viewport
+  let cursorViewportRow = -1;
+  if (cursorLineIndex >= startIndex && cursorLineIndex < endIndex) {
+    let physicalRow = 0;
+    for (let i = startIndex; i < cursorLineIndex; i++) {
+      physicalRow += visualRowHeights[i];
     }
+    cursorViewportRow = physicalRow;
   }
+
+  const adjustedCursor = (cursorViewportRow >= 0 && cursorViewportRow < maxRows)
+    ? { line: cursorViewportRow, column: cursorColumn }
+    : null;
 
   return {
     lines: viewportLines,

@@ -1,5 +1,5 @@
 import Component from '../Component.js';
-import { THEME } from '../../theme.js';
+import { rgb, bold, dim } from '../../ui/format.js';
 
 interface SelectionListProps {
   question?: string;
@@ -13,6 +13,12 @@ interface SelectionListState {
   selectedIdx: number;
 }
 
+const purpleColor: [number, number, number] = [163, 122, 204];
+const amberColor:  [number, number, number] = [242, 207, 110];
+const blueColor:   [number, number, number] = [123, 165, 218];
+const silverColor: [number, number, number] = [194, 198, 197];
+const greenColor:  [number, number, number] = [122, 195, 145];
+
 export default class SelectionList extends Component<SelectionListProps, SelectionListState> {
   constructor(props: SelectionListProps = {}) {
     super(props);
@@ -25,18 +31,20 @@ export default class SelectionList extends Component<SelectionListProps, Selecti
 
   override render(): string[] {
     const { question, items, selectedIdx } = this.state;
-
     const lines: string[] = [];
+
     if (question) {
-      lines.push(`${THEME.formatMain('◇')} ${THEME.formatTool('Ask Confirm')}`);
-      lines.push(THEME.formatTool(question));
+      const bullet = rgb(purpleColor, '●');
+      const labelStr = bold(rgb(amberColor, 'ask confirm'));
+      const dataStr = ` ${rgb(blueColor, '(')}${rgb(silverColor, question)}${rgb(blueColor, ')')}`;
+      lines.push(`  ${bullet} ${labelStr}${dataStr}`);
     }
 
     const itemsLines = items.map((item, idx) => {
       const isSelected = idx === selectedIdx;
-      const prefix = isSelected ? THEME.formatMain('➔ ') : '  ';
-      const text = isSelected ? THEME.formatMain(`[ ${item} ]`) : THEME.formatDim(`  ${item}  `);
-      return `${prefix}${text}`;
+      return isSelected
+        ? bold(rgb(greenColor, `    [ ${item} ]`))
+        : dim(`      ${item}`);
     });
 
     lines.push(...itemsLines);

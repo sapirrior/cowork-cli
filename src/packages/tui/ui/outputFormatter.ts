@@ -1,159 +1,115 @@
-import { colors } from '../../utils/index.js';
+import { logger, colors } from '../../utils/index.js';
+import stringWidth from 'string-width';
 
 const reset = '\x1b[0m';
 
-function stripAnsi(str: string): string {
-  return str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+/**
+ * Visual character width calculator aware of Unicode wide characters and ANSI escape sequences.
+ */
+function visualLength(text: string): number {
+  if (!text) return 0;
+  return stringWidth(text);
 }
 
-function visualLength(str: string): number {
-  if (!str) return 0;
-  const clean = stripAnsi(str);
-  let len = 0;
-  for (const char of clean) {
-    const cp = char.codePointAt(0);
-    if (cp === undefined) continue;
-    const isWide = (
-      (cp >= 0x4e00 && cp <= 0x9fff) ||
-      (cp >= 0x3400 && cp <= 0x4dbf) ||
-      (cp >= 0x3000 && cp <= 0x30ff) || // Symbols, Hiragana, Katakana
-      (cp >= 0xff00 && cp <= 0xffef) || // Fullwidth Forms
-      (cp >= 0x1f000 && cp <= 0x1faff) || // Emojis
-      (cp >= 0x20000 && cp <= 0x3ffff) // Extensions
-    );
-    len += isWide ? 2 : 1;
-  }
-  return len;
+/**
+ * Strips ANSI escape sequences from text.
+ */
+function stripAnsi(text: string): string {
+  return text.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
 }
 
-function applyInlineStyles(str: string): string {
-  if (!str) return '';
+/**
+ * Applies inline markdown formatting (bold, italic, inline code, links).
+ */
+function applyInlineStyles(text: string): string {
+  if (!text) return '';
+  let res = text;
 
-  // 1. Inline code: `code` -> tool color (amber) + code + reset foreground color
-  let res = str.replace(/`([^`]+)`/g, (match, code) => {
-    return `${colors.tool}${code}\x1b[39m`;
-  });
-
-  // 2. Bold styling: **text** -> bold terminal style + main color (blue) + text + reset
-  res = res.replace(/\*\*([^*]+)\*\*/g, (match, boldText) => {
-    return `\x1b[1m${colors.main}${boldText}\x1b[22m\x1b[39m`;
-  });
-
-  // 3. Italic/dim styling: *text* or _text_ -> dim color (grey) + text + reset foreground color
-  res = res.replace(/\*([^*]+)\*/g, (match, italicText) => {
-    return `${colors.dim}${italicText}\x1b[39m`;
-  });
-  res = res.replace(/_([^_]+)_/g, (match, italicText) => {
-    return `${colors.dim}${italicText}\x1b[39m`;
-  });
-
-  // 4. Link styling: [label](url) -> label (main/blue) + dim url (grey)
-  res = res.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, label, url) => {
-    return `${colors.main}${label}\x1b[39m ${colors.dim}(${url})\x1b[39m`;
-  });
+  // Inline code: `code`
+  res = res.replace(/`([^`]+)`/g, (_, code) => `${colors.tool}${code}${reset}`);
+  // Bold: **text** or __text__
+  res = res.replace(/(\*\*|__)(.*?)\1/g, (_, __, content) => `\x1b[1m${content}\x1b[22m`);
+  // Italic: *text* or _text_
+  res = res.replace(/(\*|_)(.*?)\1/g, (_, __, content) => `\x1b[3m${content}\x1b[23m`);
+  // Links: [label](url)
+  res = res.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, url) => `${colors.main}${label}${colors.dim} (${url})${reset}`);
 
   return res;
 }
 
-interface StyleState {
-  fg: string | null;
-  bold: boolean;
-  dim: boolean;
-}
+/**
+ * Balances ANSI style codes across wrapped line boundaries.
+ */
+function balanceAnsiStyles(lines: string[]): string[] {
+  let activeStyles: string[] = [];
 
-function balanceAnsiStyles(wrappedLines: string[]): string[] {
-  let state: StyleState = { fg: null, bold: false, dim: false };
+  return lines.map(line => {
+    const prefix = activeStyles.join('');
+    const matches = line.match(/\x1b\[[0-9;]*[a-zA-Z]/g) || [];
 
-  return wrappedLines.map(line => {
-    let prefix = '';
-    if (state.bold) prefix += '\x1b[1m';
-    if (state.dim)  prefix += '\x1b[2m';
-    if (state.fg)   prefix += state.fg;
-
-    const ansiRegex = /\x1b\[([0-9;]*)m/g;
-    let match: RegExpExecArray | null;
-    while ((match = ansiRegex.exec(line)) !== null) {
-      const code = match[1];
-      const parts = code.split(';');
-
-      if (parts.includes('0')) {
-        state = { fg: null, bold: false, dim: false };
+    for (const match of matches) {
+      if (match === '\x1b[0m' || match === '\x1b[39m') {
+        activeStyles = [];
       } else {
-        if (parts.includes('1')) state.bold = true;
-        if (parts.includes('2')) state.dim = true;
-        if (parts.includes('22')) {
-          state.bold = false;
-          state.dim = false;
-        }
-        if (parts.includes('39')) {
-          state.fg = null;
-        }
-        // Match foreground color escapes: 38;2;r;g;b or 38;5;n or 30-37 (named fg)
-        if (parts[0] === '38' && (parts[1] === '2' || parts[1] === '5')) {
-          state.fg = match[0];
-        } else {
-          // Check for individual parts that are named foreground colors (30-37, 90-97)
-          for (const part of parts) {
-            if ((/^3[0-7]$/.test(part) || /^9[0-7]$/.test(part)) && part !== '39') {
-              state.fg = `\x1b[${part}m`;
-            }
-          }
-        }
+        activeStyles.push(match);
       }
     }
 
-    let suffix = '';
-    if (state.bold || state.dim || state.fg) {
-      suffix += '\x1b[0m';
-    }
-
+    const suffix = activeStyles.length > 0 ? reset : '';
     return prefix + line + suffix;
   });
 }
 
 /**
- * Wraps text to the current terminal width without breaking words unless necessary.
- * Dynamically detects terminal width and preserves whitespace/indentation.
+ * Main Markdown output formatter for TUI.
+ * Converts markdown text into ANSI-formatted, word-wrapped lines.
  */
-export function outputFormatted(text: any, overrideWidth?: number): string {
-  if (text === null || text === undefined) return '';
-  // Normalize newlines, strip carriage returns, and expand tabs to preserve column alignment
-  const strText = String(text).replace(/\r/g, '').replace(/\t/g, '    ');
-  
+export function formatOutput(markdownText: string, overrideWidth?: number): string {
+  if (!markdownText) return '';
+
   let rawWidth = overrideWidth || process.stdout.columns || 80;
   if (typeof rawWidth !== 'number' || isNaN(rawWidth) || rawWidth < 10) {
     rawWidth = 80;
   }
-  
-  // Use full terminal width with a small 2-char right margin to prevent
-  // edge-wrapping artifacts on terminals that wrap at the last column.
   const width = Math.max(10, rawWidth - 2);
-  const lines = strText.split('\n');
+
+  const lines = markdownText.split('\n');
   const wrappedLines: string[] = [];
-
   let inCodeBlock = false;
-  let tableBuffer: string[] = [];   // accumulates raw pipe-delimited rows
+  let tableBuffer: string[] = [];
 
-  // ---------------------------------------------------------------------------
   // Table renderer — called when a table block is complete
-  // ---------------------------------------------------------------------------
   function renderTable(rawRows: string[]) {
-    // Parse each row into trimmed cell strings
+    // Parse each row into trimmed cell strings without empty outer pipe padding
     const parsed = rawRows.map(row => {
-      const cells = row.split('|');
-      // strip the leading/trailing empty strings caused by outer pipes
-      if (cells[0].trim() === '') cells.shift();
-      if (cells[cells.length - 1].trim() === '') cells.pop();
-      return cells.map(c => c.trim());
+      let trimmed = row.trim();
+      if (trimmed.startsWith('|')) trimmed = trimmed.slice(1);
+      if (trimmed.endsWith('|'))   trimmed = trimmed.slice(0, -1);
+      return trimmed.split('|').map(c => c.trim());
     });
 
     if (parsed.length === 0) return;
 
-    // Identify the separator row (only dashes/colons/pipes) and extract alignment
+    // Identify the separator row (dashes/colons/pipes)
     let sepIdx = parsed.findIndex(row =>
-      row.every(c => /^:?-+:?$/.test(c))
+      row.length > 0 && row.every(c => /^:?-+:?$/.test(c))
     );
-    if (sepIdx === -1) sepIdx = 1; // assume row 1 is separator if not found
+
+    // Fallback: If no valid separator row exists, render as normal text lines (not a table)
+    if (sepIdx === -1) {
+      for (const rawLine of rawRows) {
+        const formatted = applyInlineStyles(rawLine);
+        const wrappedSegments = wrapString(formatted, width);
+        const balancedSegments = balanceAnsiStyles(wrappedSegments);
+        for (const segment of balancedSegments) {
+          wrappedLines.push(segment);
+        }
+      }
+      return;
+    }
+
+    const headerRows = parsed.slice(0, sepIdx);
+    const dataRows   = parsed.slice(sepIdx + 1);
 
     const alignRow = parsed[sepIdx] || [];
     const aligns = alignRow.map(c => {
@@ -162,12 +118,11 @@ export function outputFormatted(text: any, overrideWidth?: number): string {
       return 'left';
     });
 
-    const headerRows = parsed.slice(0, sepIdx);
-    const dataRows   = parsed.slice(sepIdx + 1);
     const allDataRows = [...headerRows, ...dataRows];
+    if (allDataRows.length === 0) return;
 
-    // Determine number of columns
-    const numCols = Math.max(...allDataRows.map(r => r.length), aligns.length);
+    // Determine number of columns strictly from content rows
+    const numCols = Math.max(1, ...allDataRows.map(r => r.length));
 
     // Compute natural column widths (visual length of cell content)
     const colWidths = Array(numCols).fill(0);
@@ -180,12 +135,12 @@ export function outputFormatted(text: any, overrideWidth?: number): string {
     }
 
     // Cap table to available width: shrink columns proportionally if needed
-    // Total width = borders(numCols+1) + padding(numCols*2) + sum(colWidths)
     const borderOverhead = (numCols + 1) + (numCols * 2);
     const totalNatural   = colWidths.reduce((a, b) => a + b, 0) + borderOverhead;
     if (totalNatural > width) {
       const budget = width - borderOverhead;
-      const ratio  = budget / colWidths.reduce((a, b) => a + b, 0);
+      const totalColSum = Math.max(1, colWidths.reduce((a, b) => a + b, 0));
+      const ratio  = budget / totalColSum;
       for (let i = 0; i < numCols; i++) {
         colWidths[i] = Math.max(1, Math.floor(colWidths[i] * ratio));
       }
@@ -198,9 +153,8 @@ export function outputFormatted(text: any, overrideWidth?: number): string {
       const overflow  = visLen - colW;
       let content     = styled;
       if (overflow > 0) {
-        // Truncate the raw text first, then re-style
         const plain  = stripAnsi(styled);
-        const cut    = plain.slice(0, plain.length - overflow - 1) + '…';
+        const cut    = plain.slice(0, Math.max(1, plain.length - overflow - 1)) + '…';
         content      = applyInlineStyles(rawText.slice(0, cut.length));
       }
       const padTotal = colW - Math.min(visLen, colW);
@@ -218,14 +172,10 @@ export function outputFormatted(text: any, overrideWidth?: number): string {
     const D  = colors.dim;
     const R  = reset;
 
-    // Box-drawing helpers
-    const hbar = (w: number) => '─'.repeat(w + 2); // col width + 2 padding
+    const hbar = (w: number) => '─'.repeat(w + 2);
 
-    // ┌─...─┬─...─┐
     const topBorder = D + '┌' + colWidths.map(hbar).join('┬') + '┐' + R;
-    // ├─...─┼─...─┤  (after header)
     const midBorder = D + '├' + colWidths.map(hbar).join('┼') + '┤' + R;
-    // └─...─┴─...─┘
     const botBorder = D + '└' + colWidths.map(hbar).join('┴') + '┘' + R;
 
     function buildRow(cells: string[], isHeader: boolean) {
@@ -234,8 +184,8 @@ export function outputFormatted(text: any, overrideWidth?: number): string {
         const align   = aligns[i] || 'left';
         const fitted  = fitCell(raw, w, align);
         return isHeader
-          ? ` \x1b[1m${colors.main}${stripAnsi(fitted)}\x1b[22m${R} `
-          : ` ${fitted} `;
+          ? ` \x1b[1m${colors.main}${fitted}\x1b[22m${R} `
+          : ` ${colors.data}${fitted}${R} `;
       });
       return D + '│' + R + parts.join(D + '│' + R) + D + '│' + R;
     }
@@ -259,7 +209,7 @@ export function outputFormatted(text: any, overrideWidth?: number): string {
     wrappedLines.push('');
   }
 
-  // Helper function to wrap a string to a specific width (ANSI and wide-char aware)
+  // Helper function to wrap a string to a specific width
   function wrapString(content: string, wrapWidth: number): string[] {
     const safeWidth = Math.max(5, wrapWidth);
     if (visualLength(content) <= safeWidth) return [content];
@@ -275,7 +225,6 @@ export function outputFormatted(text: any, overrideWidth?: number): string {
       const currentLineLen = visualLength(currentLine);
 
       if (currentLineLen + tokenLen > safeWidth) {
-        // If it's a long word that exceeds the entire width
         if (tokenLen > safeWidth && !/^\s+$/.test(token)) {
           if (currentLine) {
             result.push(currentLine.trimEnd());
@@ -307,14 +256,12 @@ export function outputFormatted(text: any, overrideWidth?: number): string {
           }
           currentLine = remainingWord;
         } 
-        // If it's whitespace that causes overflow
         else if (/^\s+$/.test(token)) {
           if (currentLine) {
             result.push(currentLine.trimEnd());
             currentLine = '';
           }
         } 
-        // Normal word that causes overflow
         else {
           if (currentLine) {
             result.push(currentLine.trimEnd());
@@ -330,9 +277,20 @@ export function outputFormatted(text: any, overrideWidth?: number): string {
     return result.length > 0 ? result : [''];
   }
 
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
     // --- Table row detection (pipe-delimited, outside code blocks) -----------
-    const isTableRow = !inCodeBlock && /^\s*\|/.test(line);
+    const isNextSeparator = i + 1 < lines.length &&
+      /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$/.test(lines[i + 1]);
+
+    const isTableRow = !inCodeBlock && line.includes('|') && (
+      tableBuffer.length > 0 ||
+      /^\s*\|/.test(line) ||
+      /\|\s*$/.test(line) ||
+      isNextSeparator
+    );
+
     if (isTableRow) {
       tableBuffer.push(line.trim());
       continue;
@@ -343,7 +301,7 @@ export function outputFormatted(text: any, overrideWidth?: number): string {
       tableBuffer = [];
     }
 
-    // Check if the line already contains ANSI escape formatting (e.g., pre-colored command outputs)
+    // Check if the line already contains ANSI escape formatting
     const hasAnsi = /\x1b\[[0-9;]*[a-zA-Z]/.test(line);
     if (hasAnsi) {
       const wrappedSegments = wrapString(line, width);
@@ -386,16 +344,13 @@ export function outputFormatted(text: any, overrideWidth?: number): string {
       const level = headerMatch[1].length;
       const title = headerMatch[2];
 
-      // Color hierarchy: H1 = header (purple), H2 = main (blue), H3+ = dim
       const levelColor = level === 1 ? colors.header
                        : level === 2 ? colors.main
                        : colors.dim;
 
-      // Bold for H1 and H2, normal for H3+
       const boldStart = level <= 2 ? '\x1b[1m' : '';
       const boldEnd   = level <= 2 ? '\x1b[22m' : '';
 
-      // Add a blank line before headers for breathing room
       if (wrappedLines.length > 0 && wrappedLines[wrappedLines.length - 1] !== '') {
         wrappedLines.push('');
       }
@@ -443,7 +398,6 @@ export function outputFormatted(text: any, overrideWidth?: number): string {
     // 6. Check for Blockquote structure
     const quoteMatch = line.match(/^(\s*)(>\s?)/);
     if (quoteMatch) {
-      // Add spacing before blockquotes for breathing room
       if (wrappedLines.length > 0 && wrappedLines[wrappedLines.length - 1] !== '') {
         wrappedLines.push('');
       }
@@ -452,11 +406,9 @@ export function outputFormatted(text: any, overrideWidth?: number): string {
       const wrapWidth = Math.max(10, width - prefix.length);
       const baseColor = colors.dim;
       
-      // Prefix quote content with baseColor and restore it after any inline color resets
       const formattedContent = `${baseColor}${applyInlineStyles(content).replace(/\x1b\[39m/g, `\x1b[39m${baseColor}`)}${reset}`;
       const wrappedSegments = wrapString(formattedContent, wrapWidth);
 
-      // Use dim color for the vertical bar to make blockquotes feel integrated and soft
       const formattedPrefix = prefix.replace(/>\s?/, `${colors.dim}│ ${reset}`);
       const balancedSegments = balanceAnsiStyles(wrappedSegments);
 
@@ -494,9 +446,98 @@ export function outputFormatted(text: any, overrideWidth?: number): string {
   // Flush any table that ends at end-of-input
   if (tableBuffer.length > 0) {
     renderTable(tableBuffer);
+    tableBuffer = [];
   }
 
   return wrappedLines
     .map(line => line.replace(/[\s\u200B]+(?=(?:\x1b\[[0-9;]*[a-zA-Z]|\s)*$)/g, ''))
     .join('\n');
 }
+
+/**
+ * Formats a user prompt query for display in the TUI alternate screen.
+ */
+export function formatPromptQuery(query: string, overrideWidth?: number): string {
+  if (!query) return '';
+
+  let rawWidth = overrideWidth || process.stdout.columns || 80;
+  if (typeof rawWidth !== 'number' || isNaN(rawWidth) || rawWidth < 10) {
+    rawWidth = 80;
+  }
+
+  const termWidth = Math.max(10, rawWidth - 2);
+  const promptSymbol = `${colors.main}❯${reset}`;
+  const symbolLen = 2;
+  const wrapWidth = Math.max(10, termWidth - symbolLen);
+
+  const lines = query.split('\n');
+  const formattedLines: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line) {
+      formattedLines.push('');
+      continue;
+    }
+
+    const tokens = line.split(/(\s+)/);
+    let currentLine = '';
+    const lineSegments: string[] = [];
+
+    for (const token of tokens) {
+      if (!token) continue;
+      const tokenLen = visualLength(token);
+      const currentLen = visualLength(currentLine);
+
+      if (currentLen + tokenLen > wrapWidth) {
+        if (tokenLen > wrapWidth && !/^\s+$/.test(token)) {
+          if (currentLine) {
+            lineSegments.push(currentLine.trimEnd());
+            currentLine = '';
+          }
+          let remaining = token;
+          while (visualLength(remaining) > wrapWidth) {
+            let splitIdx = 0;
+            let vis = 0;
+            while (vis < wrapWidth && splitIdx < remaining.length) {
+              const code = remaining.charCodeAt(splitIdx);
+              const isWide = (code >= 0x3000 && code <= 0x9FFF) || (code >= 0xFF00 && code <= 0xFFEF);
+              if (vis + (isWide ? 2 : 1) > wrapWidth) break;
+              vis += isWide ? 2 : 1;
+              splitIdx++;
+            }
+            lineSegments.push(remaining.substring(0, splitIdx));
+            remaining = remaining.substring(splitIdx);
+          }
+          currentLine = remaining;
+        } else if (/^\s+$/.test(token)) {
+          if (currentLine) {
+            lineSegments.push(currentLine.trimEnd());
+            currentLine = '';
+          }
+        } else {
+          if (currentLine) {
+            lineSegments.push(currentLine.trimEnd());
+          }
+          currentLine = token;
+        }
+      } else {
+        currentLine += token;
+      }
+    }
+    if (currentLine) lineSegments.push(currentLine.trimEnd());
+    if (lineSegments.length === 0) lineSegments.push('');
+
+    for (let s = 0; s < lineSegments.length; s++) {
+      if (i === 0 && s === 0) {
+        formattedLines.push(`${promptSymbol} ${lineSegments[s]}`);
+      } else {
+        formattedLines.push(`  ${lineSegments[s]}`);
+      }
+    }
+  }
+
+  return formattedLines.join('\n');
+}
+
+export const outputFormatted = formatOutput;

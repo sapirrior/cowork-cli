@@ -14,6 +14,10 @@ import gitDiff from './gitDiff.js';
 import gitLog from './gitLog.js';
 import gitStatus from './gitStatus.js';
 import readManyFiles from './readManyFiles.js';
+import writeFile from './writeFile.js';
+import editFile from './editFile.js';
+import deleteFile from './deleteFile.js';
+import executeCommand from './executeCommand.js';
 
 
 export const toolDefinitions: OpenAI.ChatCompletionTool[] = [
@@ -268,6 +272,71 @@ export const toolDefinitions: OpenAI.ChatCompletionTool[] = [
         additionalProperties: false
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "writeFile",
+      description: "Create a new file or overwrite an existing file with provided content. Requires user confirmation before writing.",
+      parameters: {
+        type: "object",
+        properties: {
+          filePath: { type: "string", description: "Relative path of the file to create or overwrite." },
+          content:  { type: "string", description: "Full content to write to the file." }
+        },
+        required: ["filePath", "content"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "editFile",
+      description: "Edit an existing file by replacing a specific block of text with new text. Requires user confirmation before applying.",
+      parameters: {
+        type: "object",
+        properties: {
+          filePath: { type: "string", description: "Relative path of the file to edit." },
+          oldText:  { type: "string", description: "Exact text to find and replace in the file." },
+          newText:  { type: "string", description: "Text to replace oldText with." }
+        },
+        required: ["filePath", "oldText", "newText"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "deleteFile",
+      description: "Permanently delete a file. Requires user confirmation. Cannot delete directories.",
+      parameters: {
+        type: "object",
+        properties: {
+          filePath: { type: "string", description: "Relative path of the file to delete." }
+        },
+        required: ["filePath"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "executeCommand",
+      description: "Execute a shell command via bash securely. Enforces sandbox directory boundaries and security guards against system destruction commands. Requires user confirmation before running. Use for build, test, lint, install, and other terminal operations.",
+      parameters: {
+        type: "object",
+        properties: {
+          command:        { type: "string",  description: "The shell command to execute." },
+          cwd:            { type: "string",  description: "Optional working directory (defaults to project root)." },
+          timeoutSeconds: { type: "integer", description: "Optional execution timeout in seconds (default: 60, max: 300)." }
+        },
+        required: ["command"],
+        additionalProperties: false
+      }
+    }
   }
 ];
 
@@ -287,7 +356,25 @@ const toolImplementations: Record<string, (args: any) => Promise<string>> = {
   gitLog,
   gitStatus,
   readManyFiles,
+  writeFile,
+  editFile,
+  deleteFile,
+  executeCommand,
 };
+
+export const INTERACTIVE_TOOLS = new Set([
+  'askUser', 'askConfirm', 'executeCommand', 'writeFile', 'editFile', 'deleteFile',
+]);
+
+export function isInteractiveTool(name: string): boolean {
+  return INTERACTIVE_TOOLS.has(name);
+}
+
+export function isKnownTool(name: string): boolean {
+  return Object.prototype.hasOwnProperty.call(toolImplementations, name);
+}
+
+const definitionsByName = new Map(toolDefinitions.map(d => [(d as any).function?.name, (d as any).function]));
 
 /**
  * Dispatches a tool call to the appropriate implementation.
@@ -300,6 +387,18 @@ export async function dispatchTool(name: string, args: any): Promise<string> {
   if (!tool) {
     return `Error: Tool '${name}' not found.`;
   }
-  return await tool(args);
+  const def = definitionsByName.get(name);
+  if (def) {
+    const required: string[] = (def.parameters as any)?.required || [];
+    const missing = required.filter(k => args?.[k] === undefined || args?.[k] === null);
+    if (missing.length > 0) {
+      return `Error: Tool '${name}' called with missing required argument(s): ${missing.join(', ')}.`;
+    }
+  }
+  try {
+    return await tool(args);
+  } catch (err: any) {
+    return `Error: Tool '${name}' threw an unexpected error: ${err.message}`;
+  }
 }
 

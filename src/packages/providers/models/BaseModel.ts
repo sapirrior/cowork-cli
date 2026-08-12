@@ -1,6 +1,7 @@
-import { toolDefinitions, dispatchTool } from '../../agent/index.js';
+import { toolDefinitions, dispatchTool, isInteractiveTool, isKnownTool } from '../../agent/index.js';
 import { logger, formatMain, formatDim } from '../../utils/index.js';
-import { ui, outputFormatted } from '../../tui/index.js';
+import { ui, outputFormatted, formatPromptQuery } from '../../tui/index.js';
+import { getLogoLines } from '../../../assets/logo.js';
 import { OpenAI } from 'openai';
 
 // Defined at module scope: avoid re-allocating on every caught error.
@@ -32,6 +33,10 @@ const TOOL_LABELS: Record<string, string> = {
   gitLog: 'git log',
   gitStatus: 'git status',
   readManyFiles: 'loading files',
+  writeFile:      'writing file',
+  editFile:       'editing file',
+  deleteFile:     'deleting file',
+  executeCommand: 'running command',
 };
 
 /**
@@ -95,6 +100,14 @@ export default class BaseModel {
       this.addMessage('system', systemPrompt);
     }
     this.addMessage('user', query);
+
+    // Print the ANSI logo in blue with yellow eyes (alternate screen only)
+    ui.logo(getLogoLines());
+    ui.logo(['']);
+
+    // Print the user prompt with proper word wrapping and hanging left margin indent (alternate screen only)
+    ui.prompt(formatPromptQuery(query));
+    ui.prompt('');
     
     let turn = 0;
     while (turn < this.maxTurns) {
@@ -131,11 +144,14 @@ export default class BaseModel {
         // Exit loop if no tool calls are requested (Final Answer)
         if (!message.tool_calls || message.tool_calls.length === 0) {
           ui.stop(); // Stop thinking spinner with green dot (Thought)
-          if (message.content) {
+          if (message.content && message.content.trim().length > 0) {
             const formatted = outputFormatted(message.content);
             ui.log(formatted);
+          } else {
+            logger.error('[System]: Model returned an empty final response.');
           }
           this._printStats();
+          await ui.waitForExit();
           return;
         }
 
@@ -146,16 +162,17 @@ export default class BaseModel {
         // Use ui.fail() (red dot) instead of ui.stop() (green dot) so the
         // terminal reflects that the turn ended in error. fail() is a no-op when IDLE.
         ui.fail();
+        const errStr = (err.message || '').toLowerCase();
         // Deep error logging for API failures
         if (err.status) {
           logger.error(`[API Error] Status: ${err.status}`);
           if (err.response?.data) {
              logger.error(`[API Error] Details: ${JSON.stringify(err.response.data)}`);
           }
-        } else if (err.name === 'AbortError' || err.message.includes('timeout')) {
+        } else if (err.name === 'AbortError' || errStr.includes('timeout')) {
           logger.error(`[Timeout Error]: The AI took too long to respond (60s).`);
         } else {
-          logger.error(`[Error]: ${err.message}`);
+          logger.error(`[Error]: ${err.message || err}`);
         }
         throw err;
       }
@@ -163,19 +180,19 @@ export default class BaseModel {
 
     this._printStats();
     logger.secondary("[System]: Reached maximum conversation turns. Ending session.");
+    await ui.waitForExit();
   }
 
   /**
-   * Private method to fetch completion with exponential backoff for transient errors.
+   * Private method to fetch completion with non-streaming API calls, proactive throttling, and retries.
    */
   async _getCompletion(): Promise<any> {
     let attempt = 0;
-    const maxAttempts = 6; // 1 initial attempt + 5 retries
-    const minDelayBetweenRequests = 1000; // 1s proactive throttle
-    
+    const maxAttempts = 6;
+    const minDelayBetweenRequests = 1000;
+
     while (attempt < maxAttempts) {
       try {
-        // 1. Proactive Throttling (only on the first attempt of a query)
         if (attempt === 0) {
           const now = Date.now();
           const timeSinceLastRequest = now - this.lastRequestTime;
@@ -189,57 +206,56 @@ export default class BaseModel {
           model: this.model,
           messages: this.messages,
           tools: toolDefinitions as any,
-          tool_choice: "auto"
+          tool_choice: 'auto',
+          stream: false,
         });
 
-        // Update last request time on successful response
         this.lastRequestTime = Date.now();
 
-        // Accumulate token usage across all turns (usage may be absent on some providers)
-        const u = response.usage;
-        if (u) {
-          this._runUsage.prompt     += u.prompt_tokens     ?? 0;
-          this._runUsage.completion += u.completion_tokens ?? 0;
-          this._runUsage.total      += u.total_tokens      ?? 0;
+        if (response.usage) {
+          this._runUsage.prompt += response.usage.prompt_tokens || 0;
+          this._runUsage.completion += response.usage.completion_tokens || 0;
+          this._runUsage.total += response.usage.total_tokens || 0;
         }
 
-        return response;
+        const choice = response.choices?.[0];
+        if (!choice?.message) {
+          return { choices: [] };
+        }
+
+        const rawToolCalls = choice.message.tool_calls || [];
+        const tool_calls = rawToolCalls
+          .filter((tc: any) => tc.function?.name && tc.function.name.trim().length > 0 && tc.id)
+          .map((tc: any) => ({
+            id: tc.id,
+            type: 'function' as const,
+            function: { name: tc.function.name, arguments: tc.function.arguments || '{}' }
+          }));
+
+        return {
+          choices: [
+            {
+              finish_reason: choice.finish_reason || (tool_calls.length > 0 ? 'tool_calls' : 'stop'),
+              message: {
+                role: 'assistant',
+                content: choice.message.content || '',
+                ...(tool_calls.length > 0 ? { tool_calls } : {}),
+              }
+            }
+          ]
+        };
 
       } catch (err: any) {
-        // Transient HTTP status codes (rate-limit, server errors)
         const isHttpTransient = [429, 500, 502, 503, 504].includes(err.status);
         const isNetTransient = TRANSIENT_NET_CODES.has(err.code);
         const isTransient = isHttpTransient || isNetTransient;
 
         attempt++;
         if (isTransient && attempt < maxAttempts) {
-          // Cap exponential delay at MAX_BACKOFF_MS to prevent unbounded wait times.
           let delay = Math.min(Math.pow(2, attempt) * 1000, MAX_BACKOFF_MS);
-
-          // 2. Adhere to Retry-After header if present (HTTP errors only)
-          const retryAfter = err.headers?.['retry-after'];
-          if (retryAfter) {
-            const seconds = parseInt(retryAfter);
-            if (!isNaN(seconds)) {
-              // Clamp to [1s, MAX_BACKOFF_MS] so a zero/negative header cannot bypass throttling
-              // and an absurd value cannot hang the process.
-              delay = Math.min(Math.max(seconds * 1000, 1000), MAX_BACKOFF_MS);
-            } else {
-              // Handle Date string format
-              const retryDate = new Date(retryAfter);
-              if (!isNaN(retryDate.getTime())) {
-                // Clamp — past dates become 1s, far-future dates are capped at MAX_BACKOFF_MS
-                // so the process can never hang indefinitely.
-                delay = Math.min(Math.max(retryDate.getTime() - Date.now(), 1000), MAX_BACKOFF_MS);
-              }
-            }
-          }
-
-          // 3. Apply Jitter (randomness to prevent thundering herd)
           const jitter = Math.random() * 500;
           const finalDelay = delay + jitter;
 
-          // Show a meaningful label: HTTP status or Node error code
           const errLabel = err.status ?? err.code ?? 'Network error';
           ui.update(`${errLabel}. Retrying in ${(finalDelay/1000).toFixed(1)}s`);
           await new Promise(resolve => setTimeout(resolve, finalDelay));
@@ -250,7 +266,6 @@ export default class BaseModel {
       }
     }
 
-    // Exhaustion guard
     throw new Error('_getCompletion: retry loop exhausted without returning a response.');
   }
 
@@ -258,12 +273,35 @@ export default class BaseModel {
    * Private method to handle tool calls with deep error recovery and parallel execution.
    */
   async _processToolCalls(toolCalls: any[]): Promise<void> {
+    // Unmount thinking spinner so interactive tools and stdin prompts run cleanly
+    ui.stop();
+
     const parsedCalls = [];
     for (const toolCall of toolCalls) {
-      const name = toolCall.function.name;
+      const name = toolCall.function?.name;
+      if (!name || typeof name !== 'string' || name.trim() === '') {
+        parsedCalls.push({
+          toolCall,
+          name: name || '(unknown)',
+          args: null,
+          error: new Error(`Tool call arrived with missing or empty function name — skipped.`)
+        });
+        continue;
+      }
+
+      if (!isKnownTool(name)) {
+        parsedCalls.push({
+          toolCall,
+          name,
+          args: null,
+          error: new Error(`Unknown tool '${name}' requested by model.`)
+        });
+        continue;
+      }
+
       let args;
       try {
-        args = JSON.parse(toolCall.function.arguments);
+        args = JSON.parse(toolCall.function.arguments || '{}');
         parsedCalls.push({ toolCall, name, args, error: null });
       } catch (parseErr: any) {
         parsedCalls.push({
@@ -275,10 +313,9 @@ export default class BaseModel {
       }
     }
 
-    // Interactive tools (like askUser, askConfirm) must be run sequentially.
-    // Non-interactive tools can run in parallel.
-    const interactiveCalls = parsedCalls.filter(c => c.name === 'askUser' || c.name === 'askConfirm');
-    const nonInteractiveCalls = parsedCalls.filter(c => c.name !== 'askUser' && c.name !== 'askConfirm');
+    // Use centralized isInteractiveTool helper
+    const interactiveCalls = parsedCalls.filter(c => isInteractiveTool(c.name));
+    const nonInteractiveCalls = parsedCalls.filter(c => !isInteractiveTool(c.name));
 
     // 1. Process non-interactive calls in parallel
     if (nonInteractiveCalls.length > 0) {
@@ -314,11 +351,10 @@ export default class BaseModel {
       }
     }
 
-    // 2. Process interactive calls sequentially
+    // 2. Process interactive calls sequentially (no blank lines between tools)
     for (const c of interactiveCalls) {
       try {
         if (c.error) throw c.error;
-        // Interactive tools handle their own prompting and do not require ui.start/ui.stop spinners
         const result = await dispatchTool(c.name, c.args);
         this.addMessage('tool', result, { tool_call_id: c.toolCall.id });
       } catch (err: any) {
@@ -327,13 +363,23 @@ export default class BaseModel {
         this.addMessage('tool', `Error: ${errorMsg}`, { tool_call_id: c.toolCall.id });
       }
     }
+
+    // Single blank line spacer between tool output batch and the next response
+    ui.log('');
   }
 
   /**
    * Overridden by subclasses to handle provider-specific message formatting.
    */
   async handleResponse(message: any): Promise<void> {
-    this.messages.push(message);
+    const clean: any = {
+      role: 'assistant',
+      content: typeof message.content === 'string' ? message.content : '',
+    };
+    if (Array.isArray(message.tool_calls) && message.tool_calls.length > 0) {
+      clean.tool_calls = message.tool_calls;
+    }
+    this.messages.push(clean);
   }
 
   /**

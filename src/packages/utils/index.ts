@@ -23,6 +23,6 @@ export {
   isSafeEntry,
   shouldIgnore,
   safePath,
-  IgnorePattern
+  IgnorePattern,
 };
 

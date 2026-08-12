@@ -1,6 +1,6 @@
-# A sub package named providers for haiku-67 for handling connections to model service providers and executing responses
+# Provider Package (`@sapirror/sonnet-cli` — providers)
 
-This package encapsulates interactions with the AI models, handles custom model client instantiations, manages context history, handles connection retries, and executes the conversation loop.
+This package encapsulates interactions with AI model services, handles OpenAI client instantiations, manages context history, handles non-streaming completions and connection retries, and executes the conversation loop.
 
 ---
 
@@ -11,36 +11,31 @@ This package encapsulates interactions with the AI models, handles custom model 
 | File | Export / Item | Type | Description |
 | :--- | :--- | :--- | :--- |
 | `index.ts` | `clientLoader` | Export | Initializes and retrieves an OpenAI client configured for the active provider. |
-| | `BaseModel` | Export | The base class coordinator for LLM dialog, retry, and tool-handling loop. |
+| | `BaseModel` | Export | Base class coordinator for LLM dialog, retries, and tool execution loops. |
 | | `DefaultModel` | Export | Handler for standard OpenAI-compatible endpoints. |
 | | `GeminiModel` | Export | Handler for Google Gemini endpoints. |
 | `client.ts` | `clientLoader()` | Function | Returns a preconfigured `OpenAI` client instance. Strips trailing slashes from endpoint URLs. Disables client-side retries (`maxRetries: 0`) and sets a timeout of 60 seconds. |
 
 ---
 
-### Model Classes (`models/` Sub-directory)
+## Model Classes (`models/` Sub-directory)
 
-Contains base structures and specific subclasses to abstract vendor-specific requirements.
-
-#### `BaseModel.ts` (The Core Loop Handler)
-Manages model response streams, automatic backoff, and parallel tool dispatch.
+### `BaseModel.ts` (The Core Loop Handler)
+Manages model requests, non-streaming completions (`stream: false`), automatic backoff, and tool dispatch.
 
 * **Key Constants & Settings:**
-  - `TRANSIENT_NET_CODES`: Retries immediately on transient DNS or socket errors (`ECONNRESET`, `ETIMEDOUT`, `ECONNREFUSED`, `EAI_AGAIN`, `ENETUNREACH`, `EHOSTUNREACH`).
+  - `TRANSIENT_NET_CODES`: Retries automatically on transient network error codes (`ECONNRESET`, `ETIMEDOUT`, `ECONNREFUSED`, `EAI_AGAIN`, `ENETUNREACH`, `EHOSTUNREACH`).
   - `maxTurns`: Capped at 15 turns to prevent infinite tool calling loops.
-  - `MAX_BACKOFF_MS`: Caps linear/exponential delays at 30 seconds.
+  - `MAX_BACKOFF_MS`: Caps exponential/linear retry delays at 30 seconds.
 * **Key Functions:**
-  - `addMessage(role, content, extra)`: Records message elements (roles: `user`, `assistant`, `system`, `tool`) in the active thread history array.
-  - `run(query, systemPrompt)`: Executes the main multi-turn loop. Feeds back tool outputs, tracks token usage metrics, handles content warnings, and prints final formatted responses.
-  - `handleResponse(message)`: Invoked after each turn. Appends the message to history. Can be overridden by subclasses.
-  - `_getCompletion()`: Calls the OpenAI SDK completion API. Wraps executions in a retry handler.
-  - `_getCompletionWithRetry(...)`: Coordinates linear backoff sleep periods (starts at 1s, scales linearly up to `MAX_BACKOFF_MS`) for connection failures.
-  - `_processToolCalls(toolCalls)`: Executes non-interactive tool calls in parallel using `Promise.all` while executing interactive tool calls (`askUser`, `askConfirm`) sequentially to avoid terminal input collisions. Updates progress indicator components via TUI packages, and reports execution logs to the console.
+  - `addMessage(role, content, extra)`: Appends messages (`user`, `assistant`, `system`, `tool`) to conversation history.
+  - `run(query, systemPrompt)`: Executes the main execution loop. Prints the TrueColor linear gradient logo and word-wrapped prompt, feeds back tool outputs, tracks token usage metrics, and calls `ui.waitForExit()` before returning.
+  - `handleResponse(message)`: Invoked after each turn. Appends response payload to history. Overridden by `GeminiModel`.
+  - `_getCompletion()`: Executes atomic non-streaming API requests (`stream: false`).
+  - `_processToolCalls(toolCalls)`: Executes non-interactive tool calls in parallel using `Promise.all` while executing interactive tool calls (`askUser`, `askConfirm`, `writeFile`, `editFile`, `deleteFile`, `executeCommand`) sequentially to avoid terminal input collisions.
 
-#### `default.ts` (`DefaultModel`)
-Inherits direct capabilities from `BaseModel`. Intended for standard OpenAI compatibility.
+### `default.ts` (`DefaultModel`)
+Standard OpenAI-compatible completion subclass inheriting from `BaseModel`.
 
-#### `gemini.ts` (`GeminiModel`)
-Handles integration nuances unique to Google Gemini. 
-* **Key Override:**
-  - `handleResponse(message)`: Pushes the complete message payload (retaining API metadata properties such as `thought_signature`) to ensure multi-turn calls do not fail validation on subsequent context submissions.
+### `gemini.ts` (`GeminiModel`)
+Subclass for Google Gemini models. Retains vendor-specific metadata (such as `thought_signature`) in context message payloads.

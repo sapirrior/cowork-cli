@@ -1,7 +1,7 @@
-# 🌿 haiku-67
+# 🌿 Sonnet CLI (`@sapirror/sonnet-cli`)
 
 > **Stop waiting. Start knowing.**
-> A read-only AI engineering co-worker that lives in your terminal and understands your codebase.
+> An autonomous AI engineering co-worker that lives in your terminal, investigates codebases, writes and edits code, runs terminal commands, and verifies solutions.
 
 ---
 
@@ -9,77 +9,82 @@
 
 ### 📦 Installation
 ```bash
-npm install -g haiku-67
+npm install -g @sapirror/sonnet-cli
 ```
 
 ### 🔑 Configuration
-Set up your AI provider interactively. `haiku` supports **any** OpenAI-compatible API (Ollama, OpenRouter, Google Gemini, OpenAI, etc.).
+Set up your AI provider interactively. `sonnet` supports **any** OpenAI-compatible API (Google Gemini, OpenAI, OpenRouter, Ollama, custom providers, etc.).
 
 ```bash
 # Open interactive login wizard (shows setup status & active configuration)
-haiku --login
+sonnet --login
 
 # Or directly switch to / setup a specific provider
-haiku --login google
-haiku --login openai
-haiku --login openrouter
-haiku --login local
+sonnet --login google
+sonnet --login openai
+sonnet --login openrouter
+sonnet --login ollama
+sonnet --login custom
 ```
-*Credentials are saved in `~/.config/haiku/auth.json`.*
+*Credentials are saved in `~/.config/sonnet/auth.json`.*
 
 ---
 
 ## 💡 Real-World Usage
 
-Instead of open-ended chatting, `haiku` **investigates** your project using safe, built-in tools (which respect `.gitignore`).
+Instead of open-ended chatting, `sonnet` **investigates, writes, edits, and executes** in your project using safe, built-in tools (which respect `.gitignore`).
 
 ### 🔍 Codebase Exploration
 ```bash
-haiku "Where is the authentication logic handled?"
+sonnet "Where is the authentication logic handled?"
 ```
 
-### 🐛 Debugging & Analysis
+### 🛠️ Code Editing & Refactoring
 ```bash
-haiku "Find all 'FIXME' tags in src/ and point out the most critical one"
+sonnet "Refactor the database connection pool in src/db.ts to use singleton pattern"
+```
+
+### ⚡ Build & Test Execution
+```bash
+sonnet "Run the build script and fix any TypeScript compilation errors in src/"
 ```
 
 ### 🧬 Piping Inputs
 ```bash
-git diff | haiku "Write a clean commit message for these changes"
+git diff | sonnet "Write a clean commit message for these changes"
 ```
 
 ---
 
 ## ✨ Features That Matter
 
-* **🔌 Universal Compatibility**: Seamless support for OpenAI, local models (Ollama/Llama), OpenRouter, and dedicated handlers for **Google Gemini** (preserving thought metadata).
+* **🔌 Universal Provider Support**: Native support for Google Gemini (preserving thought metadata), OpenAI, OpenRouter, Ollama (local), and custom HTTP base endpoints.
+* **⚡ Non-Streaming Stability**: Standard atomic completions (`stream: false`) ensuring zero chunk aggregation overhead and accurate token tracking.
 * **🖥️ State-Driven TUI Engine**: Zero-flicker rendering powered by a `DocumentTree` state model operating inside the Alternate Screen Buffer (`\x1b[?1049h`).
-* **🖱️ Natural Trackpad Scrolling & Keybindings**: Full mouse wheel scroll support (`\x1b[?1007h`), trackpad gestures, `PageUp`/`PageDown`, `Home`/`End`, and `↑`/`↓` Arrow keys.
-* **🔍 Dynamic Terminal Zooming**: Resizing or zooming font size (`Ctrl+`/`Ctrl-`) reflows text line-wrapping instantly with zero ghost lines or scrollback corruption.
-* **🎨 Markdown Rendering**: Custom TUI compiler rendering headings, lists, tables, bold styling, and blockquotes with full CJK character width support.
-* **🔧 Powerful Tool Suite**:
-  * `searchText` (Regex searches with context window lines)
-  * `readManyFiles` (Consolidated matching file reader)
-  * `projectTree` (Visual directory structure overview)
-  * `webSearch` & `webFetch` (Browse the web / read live docs inline)
-* **🛡️ Sandboxed I/O**: Safe path validation preventing directory traversal attacks.
+* **🎨 24-Bit TrueColor Gradient Logo**: Beautiful TrueColor linear gradient logo (Deep Indigo Violet ➔ Electric Cyan) paired with randomly selected philosophical engineering quotes on each run.
+* **🛡️ Symbol-Free Lean Tool Confirmation Cards**: Minimalist, text-first interactive tool confirmation UI with content showcase previews, framed along the left edge by a bright Yellow vertical border (`│`), and instant keybindings (`y`/`n`/`Enter`/`Esc`/`Tab`/`Ctrl+Y`/`Ctrl+N`/`Ctrl+E`/`Arrow keys`).
+* **🧹 Clean Terminal Scrollback**: Alternate screen history filtering ensures the logo and prompt remain in the TUI screen, keeping your main terminal scrollback completely clean.
+* **🔧 19 Agentic Tools**:
+  * Read/Search: `readFile`, `readDir`, `projectTree`, `readFileChunk`, `searchText`, `findFile`, `findDir`, `readManyFiles`
+  * Git/Web: `gitDiff`, `gitLog`, `gitStatus`, `webFetch`, `webSearch`
+  * Mutating/Executing: `writeFile`, `editFile`, `deleteFile`, `executeCommand`
+  * Interactive: `askUser`, `askConfirm`
+* **🛡️ Path Sandboxing**: Resolves all file paths through `safePath` sandbox boundaries to prevent directory traversal.
 
 ---
 
 ## 🏗️ Project Architecture
 
-The codebase is split into modular packages under `src/packages/`:
-
 ```
 src/
-├── bin/          # CLI executable entrypoint (cli.ts)
+├── bin/          # Shell executable entrypoint (cli.ts)
 ├── core/         # CLI argument and stdin pipelines (index.ts)
-└── packages/     # Isolated packages with clean public APIs:
-    ├── 🤖 agent/     # Agent loops & tool execution (searchText, readManyFiles, etc.)
-    ├── ⚙️ config/    # Configuration manager and login wizard prompts
-    ├── 🔌 providers/ # LLM integration handlers (BaseModel, GeminiModel, client)
-    ├── 🎨 tui/       # Console rendering engine, custom layout component loops
-    └── 🛠️ utils/     # Ignore file parsers, logging colors, and path safety
+└── packages/     # Subsystem packages:
+    ├── 🤖 agent/     # Agent loops, tool implementations & dispatch protocol
+    ├── ⚙️ config/    # Configuration manager and login credential wizard
+    ├── 🔌 providers/ # LLM integration handlers (BaseModel, GeminiModel)
+    ├── 🎨 tui/       # Terminal engine, DocumentTree, and ToolConfirmationCard
+    └── 🛠️ utils/     # Ignore file parsers, path safety (safePath), and logger
 ```
 
 ---
@@ -88,15 +93,15 @@ src/
 
 | Command | Action |
 | :--- | :--- |
-| `haiku "<query>"` | Run a one-shot analysis on your codebase. |
-| `haiku -l`, `--login [provider]` | Interactive setup or active provider switch (`google`, `openai`, `openrouter`, `local`). |
-| `haiku -v`, `--version` | Print the active version. |
-| `haiku -h`, `--help` | Show usage options. |
+| `sonnet "<query>"` | Run an autonomous engineering task on your codebase. |
+| `sonnet -l`, `--login [provider]` | Interactive setup or active provider switch (`google`, `openai`, `openrouter`, `ollama`, `custom`). |
+| `sonnet -v`, `--version` | Print active package version. |
+| `sonnet -h`, `--help` | Show CLI help message. |
 
-**Aliases**: `haiku`, `hku`, and `hk` all invoke the same binary.
+**Binaries / Aliases**: `sonnet`, `snt`
 
 ---
 
-## 🤝 Contributing
+## 🤝 License
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for architecture details, code style, and PR guidelines.
+MIT © nolan stark

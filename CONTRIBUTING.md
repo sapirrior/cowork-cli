@@ -1,6 +1,6 @@
-# 🤝 Contributing to haiku-67
+# 🤝 Contributing to sonnet
 
-Thank you for considering a contribution to **haiku-67**. This document is a complete self-service guide — read it top to bottom before opening an issue or a PR.
+Thank you for considering a contribution to **sonnet**. This document is a complete self-service guide — read it top to bottom before opening an issue or a PR.
 
 > [!IMPORTANT]
 > All contributors must follow the [Code of Conduct](./CODE_OF_CONDUCT.md). This project enforces a zero-tolerance policy on harassment.
@@ -9,7 +9,7 @@ Thank you for considering a contribution to **haiku-67**. This document is a com
 
 ## 🧭 Scope & Non-Goals
 
-**haiku-67** is a **read-only AI engineering co-worker for the terminal**. Before contributing, verify your change aligns with this scope.
+**sonnet** is a **read-only AI engineering co-worker for the terminal**. Before contributing, verify your change aligns with this scope.
 
 ### ✅ In Scope
 - Improvements to tool accuracy and sandboxing reliability
@@ -17,12 +17,13 @@ Thank you for considering a contribution to **haiku-67**. This document is a com
 - Additional AI provider integrations (OpenAI-compatible APIs)
 - Bug fixes, security patches
 - Documentation and test coverage improvements
+- Tool confirmation gate improvements (every mutating or command-execution tool must call ui.confirm() before acting)
 
 ### ❌ Out of Scope (will be closed without review)
-- Write/edit/run-command capabilities (this is a read-only tool by design)
+- Mutating tools without a confirmation gate (every write/edit/delete/exec tool MUST route through ui.confirm() — no exceptions)
 - New heavy runtime dependencies (check `package.json` — we keep it minimal)
 - Alternative UI frameworks (we use raw ANSI, not `blessed`, `ink`, etc.)
-- Breaking changes to the `~/.config/haiku/auth.json` schema without a migration path
+- Breaking changes to the `~/.config/sonnet/auth.json` schema without a migration path
 
 ---
 
@@ -35,8 +36,8 @@ Thank you for considering a contribution to **haiku-67**. This document is a com
 
 ### 1. Clone and install
 ```bash
-git clone https://github.com/sapirrior/haiku-67.git
-cd haiku-67
+git clone https://github.com/sapirrior/sonnet.git
+cd sonnet
 npm install
 ```
 
@@ -61,7 +62,7 @@ Zero TypeScript errors is the bar. `tsc --strict` mode is enforced.
 
 ## 🏗️ Architecture Overview
 
-`haiku-67` is a modular CLI agent loop built on **Node.js + TypeScript ESM**.
+`sonnet` is a modular CLI agent loop built on **Node.js + TypeScript ESM**.
 
 ### Execution Lifecycle
 
@@ -72,7 +73,7 @@ Zero TypeScript errors is the bar. `tsc --strict` mode is enforced.
 [src/core/index.ts]  ← Parses CLI flags, reads stdin, loads config, checks connectivity.
      │
      ├──► [src/packages/config/]
-     │        configManager.ts  ← Load & validate ~/.config/haiku/auth.json
+     │        configManager.ts  ← Load & validate ~/.config/sonnet/auth.json
      │        loginWizard.ts    ← Interactive provider setup wizard
      │
      ├──► [src/packages/providers/]
@@ -111,7 +112,7 @@ Zero TypeScript errors is the bar. `tsc --strict` mode is enforced.
 ## 🛠️ Development Workflow
 
 ### 1. Pick or open an issue
-- Check [existing issues](https://github.com/sapirrior/haiku-67/issues) before starting work.
+- Check [existing issues](https://github.com/sapirrior/sonnet/issues) before starting work.
 - For significant changes, open an issue first to align on approach before writing code.
 
 ### 2. Branch naming
@@ -238,7 +239,7 @@ Whenever you modify **any file inside a package directory** (`src/packages/*`), 
 
 ## 🔧 Extending the Tool Suite
 
-Adding a new tool requires touching 4 places:
+Adding a new tool requires touching 4 places (5 if it mutates state):
 
 ### Step 1 — Implement the handler
 Create `src/packages/agent/tools/myTool.ts`:
@@ -289,11 +290,23 @@ Add to `TOOL_LABELS` in `src/packages/providers/models/BaseModel.ts`:
 myTool: 'Running myTool',
 ```
 
+### Step 5 — Register as interactive (if it mutates state)
+If your tool mutates state, creates/modifies files, or runs commands, add its name to `INTERACTIVE_TOOLS` in `src/packages/agent/tools/index.ts`:
+
+```typescript
+export const INTERACTIVE_TOOLS = new Set([
+  'askUser', 'askConfirm', 'executeCommand', 'writeFile', 'editFile', 'deleteFile',
+  'myTool', // ← add here
+]);
+```
+
+This ensures the tool runs sequentially (never in parallel with other interactive tools) and prevents duplicate stdin listener conflicts.
+
 ---
 
 ## 📝 sys.txt Authoring Guide
 
-`src/packages/config/configs/sys.txt` is the Haiku system prompt injected at the start of every agent session. Editing it affects **every** user interaction. Follow these 2026 best practices:
+`src/packages/config/configs/sys.txt` is the Sonnet system prompt injected at the start of every agent session. Editing it affects **every** user interaction. Follow these 2026 best practices:
 
 ### Structure (in this order)
 ```

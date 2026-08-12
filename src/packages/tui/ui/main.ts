@@ -3,6 +3,7 @@ import * as format from './format.js';
 import * as spinner from './spinner.js';
 import * as prompt from './prompt.js';
 import Spinner from '../engine/components/Spinner.js';
+import { THEME } from '../theme.js';
 
 class UIEngine {
   engine: TerminalEngine;
@@ -33,23 +34,74 @@ class UIEngine {
     this.engine.commit('log', lines);
   }
 
+  logo(lines: string[]): void {
+    this.engine.commit('logo', lines);
+  }
+
+  prompt(text: string): void {
+    const lines = text.split('\n');
+    if (lines.length > 1 && lines[lines.length - 1] === '') {
+      lines.pop();
+    }
+    this.engine.commit('prompt', lines);
+  }
+
   header(title: string): void {
-    const purple: [number, number, number] = [163, 122, 204];
-    const blue: [number, number, number] = [123, 165, 218];
-    this.log(`${this._rgb(purple, '●')} ${this._rgb(blue, this._bold(title.toLowerCase()))}`);
+    this.log(`${this._rgb(THEME.header, '●')} ${this._rgb(THEME.main, this._bold(title.toLowerCase()))}`);
   }
 
   footer(duration: string | number): void {
-    const blue: [number, number, number] = [123, 165, 218];
-    this.log(`${this._dim('time')} ${this._rgb(blue, duration + 's')}`);
+    this.log(`${this._dim('time')} ${this._rgb(THEME.main, duration + 's')}`);
   }
 
   async ask(question: string): Promise<string> {
     return prompt.ask(this, question);
   }
 
-  async confirm(question: string): Promise<{ confirmed: boolean; dismissed?: boolean }> {
-    return prompt.confirm(this, question);
+  async confirm(question: string, options?: prompt.ToolConfirmOptions): Promise<{ confirmed: boolean; dismissed?: boolean }> {
+    return prompt.confirm(this, question, options);
+  }
+
+  async confirmTool(options: prompt.ToolConfirmOptions): Promise<{ confirmed: boolean; dismissed?: boolean }> {
+    return prompt.confirmTool(this, options);
+  }
+
+  async waitForExit(): Promise<void> {
+    if (!process.stdin.isTTY) return;
+
+    this.log('');
+    this.log(format.dim('(press any key to exit)'));
+
+    return new Promise<void>((resolve) => {
+      const onData = (chunk: Buffer) => {
+        const str = chunk.toString();
+
+        // Ignore mouse tracking events (\x1b[<...)
+        if (str.includes('\x1b[<')) {
+          return;
+        }
+
+        cleanup();
+        resolve();
+      };
+
+      const cleanup = () => {
+        if (process.stdin.isTTY) {
+          process.stdin.setRawMode(false);
+        }
+        process.stdin.off('data', onData);
+      };
+
+      if (process.stdin.isTTY) {
+        process.stdin.setRawMode(true);
+      }
+      try {
+        process.stdin.read();
+      } catch {}
+      process.stdin.ref();
+      process.stdin.resume();
+      process.stdin.on('data', onData);
+    });
   }
 
   async cleanup(): Promise<void> {

@@ -1,5 +1,5 @@
 import Component from '../Component.js';
-import { THEME } from '../../theme.js';
+import { rgb, bold, dim } from '../../ui/format.js';
 
 interface SelectorItem {
   label: string;
@@ -19,6 +19,12 @@ interface ProviderSelectorState {
   selectedIdx: number;
 }
 
+const purpleColor: [number, number, number] = [163, 122, 204];
+const amberColor:  [number, number, number] = [242, 207, 110];
+const blueColor:   [number, number, number] = [123, 165, 218];
+const silverColor: [number, number, number] = [194, 198, 197];
+const greenColor:  [number, number, number] = [122, 195, 145];
+
 export default class ProviderSelector extends Component<ProviderSelectorProps, ProviderSelectorState> {
   constructor(props: ProviderSelectorProps = {}) {
     super(props);
@@ -31,38 +37,22 @@ export default class ProviderSelector extends Component<ProviderSelectorProps, P
 
   override render(): string[] {
     const { title, items, selectedIdx } = this.state;
-
-    const width = process.stdout.columns || 80;
-
-    // Truncate title if it exceeds terminal width
-    const maxTitleLen = width - 4;
-    const displayTitle = title.length > maxTitleLen
-      ? title.slice(0, maxTitleLen - 3) + '...'
-      : title;
-
     const lines: string[] = [];
-    lines.push(`${THEME.formatMain('◇')} ${THEME.formatTool(THEME.bold(displayTitle))}`);
-    lines.push('');
+
+    const bullet = rgb(purpleColor, '●');
+    const labelStr = bold(rgb(amberColor, 'select provider'));
+    const dataStr = ` ${rgb(blueColor, '(')}${rgb(silverColor, title)}${rgb(blueColor, ')')}`;
+    lines.push(`  ${bullet} ${labelStr}${dataStr}`);
 
     const itemsLines = items.map((item, idx) => {
       const isSelected = idx === selectedIdx;
       const tick = item.configured ? '✓' : ' ';
       const activeSufx = item.active ? ' (active)' : '';
-      let fullLabel = `${tick} ${item.label}${activeSufx}`;
+      const fullLabel = `${tick} ${item.label}${activeSufx}`;
 
-      // Truncate item label if it exceeds terminal width
-      const maxLabelLen = width - 8;
-      if (fullLabel.length > maxLabelLen) {
-        fullLabel = fullLabel.slice(0, maxLabelLen - 3) + '...';
-      }
-
-      if (isSelected) {
-        return `${THEME.formatMain('➔ ')}${THEME.formatMain(`[ ${fullLabel} ]`)}`;
-      } else if (item.configured) {
-        return `    ${fullLabel}`;
-      } else {
-        return THEME.formatDim(`    ${fullLabel}`);
-      }
+      return isSelected
+        ? bold(rgb(greenColor, `    [ ${fullLabel} ]`))
+        : dim(`      ${fullLabel}`);
     });
 
     lines.push(...itemsLines);

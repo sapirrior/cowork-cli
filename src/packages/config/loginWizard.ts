@@ -5,7 +5,7 @@ import path from 'path';
 import os from 'os';
 import { Config } from './configManager.js';
 
-const configDir = path.join(os.homedir(), '.config', 'haiku');
+const configDir = path.join(os.homedir(), '.config', 'sonnet');
 const authPath = path.join(configDir, 'auth.json');
 
 // ─── Provider Registry ────────────────────────────────────────────────────────
@@ -15,17 +15,19 @@ interface ProviderMeta {
   defaultModel: string;
   url: string;
   type: string;
+  skipKey?: boolean;
+  customUrl?: boolean;
 }
 
 const PROVIDERS_MAP: Record<string, ProviderMeta> = {
-  'google':     { name: 'Google Gemini', defaultModel: 'gemini-1.5-flash', url: 'https://generativelanguage.googleapis.com/v1beta/openai', type: 'gemini' },
-  'openai':     { name: 'OpenAI',        defaultModel: 'gpt-4o-mini',       url: 'https://api.openai.com/v1',                               type: 'openai' },
-  'openrouter': { name: 'OpenRouter',    defaultModel: 'google/gemini-2.5-flash', url: 'https://openrouter.ai/api/v1',                      type: 'openai' },
-  'local':      { name: 'Local',         defaultModel: 'meta-llama/llama-3', url: '',                                                       type: 'openai' },
+  'google':     { name: 'Google Gemini',  defaultModel: 'gemini-2.0-flash', url: 'https://generativelanguage.googleapis.com/v1beta/openai', type: 'gemini' },
+  'openai':     { name: 'OpenAI',         defaultModel: 'gpt-4o-mini',       url: 'https://api.openai.com/v1',                               type: 'openai' },
+  'openrouter': { name: 'OpenRouter',     defaultModel: 'google/gemini-2.5-flash', url: 'https://openrouter.ai/api/v1',                     type: 'openrouter' },
+  'ollama':     { name: 'Ollama (Local)', defaultModel: 'llama3.3',          url: 'http://localhost:11434/v1',                               type: 'ollama', skipKey: true },
+  'custom':     { name: 'Custom Provider',defaultModel: '',                  url: '',                                                       type: 'custom', customUrl: true },
 };
 
-// Ordered list of keys for display
-const PROVIDER_KEYS = ['google', 'openai', 'openrouter', 'local'];
+const PROVIDER_KEYS = ['google', 'openai', 'openrouter', 'ollama', 'custom'];
 
 interface AuthConfig {
   version?: number;
@@ -35,9 +37,6 @@ interface AuthConfig {
 
 // ─── Auth File I/O ────────────────────────────────────────────────────────────
 
-/**
- * Loads the current auth.json file, or returns a blank default structure.
- */
 function loadAuthFile(): AuthConfig {
   try {
     if (fs.existsSync(authPath)) {
@@ -47,34 +46,28 @@ function loadAuthFile(): AuthConfig {
         parsed.providers = parsed.providers || {};
         return parsed as AuthConfig;
       } else {
-        logger.error(`Error loading configuration: ~/.config/haiku/auth.json is invalid.`);
+        logger.error(`Error loading configuration: ~/.config/sonnet/auth.json is invalid.`);
       }
     }
   } catch (err: any) {
-    logger.error(`Error reading or parsing ~/.config/haiku/auth.json: ${err.message}`);
+    logger.error(`Error reading or parsing ~/.config/sonnet/auth.json: ${err.message}`);
   }
   return { active: null, providers: {} };
 }
 
-/**
- * Writes the auth configuration back to ~/.config/haiku/auth.json
- */
 function saveAuthFile(authConfig: AuthConfig): void {
   const tmpPath = authPath + '.tmp';
   try {
     if (!fs.existsSync(configDir)) {
       fs.mkdirSync(configDir, { recursive: true });
     }
-    // Increment or initialize schema version
     authConfig.version = 1;
     fs.writeFileSync(tmpPath, JSON.stringify(authConfig, null, 2), { encoding: 'utf8', mode: 0o600 });
     fs.renameSync(tmpPath, authPath);
     ui.log(formatMain(`Successfully updated configuration at ${authPath}`));
   } catch (err: any) {
     try {
-      if (fs.existsSync(tmpPath)) {
-        fs.unlinkSync(tmpPath);
-      }
+      if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
     } catch {}
     logger.error(`Failed to save auth configuration: ${err.message}`);
   }
@@ -82,27 +75,17 @@ function saveAuthFile(authConfig: AuthConfig): void {
 
 // ─── Provider Utilities ───────────────────────────────────────────────────────
 
-/**
- * Normalizes a user-supplied provider name/alias to a canonical key.
- * Returns null if the input doesn't match any known provider.
- */
 function normalizeProviderKey(input: string): string | null {
   const clean = input.toLowerCase().trim();
   if (clean.includes('google') || clean.includes('gemini')) return 'google';
   if (clean === 'openai' || clean.includes('gpt'))           return 'openai';
   if (clean.includes('openrouter'))                          return 'openrouter';
-  if (clean === 'local' || clean.includes('llama') || clean.includes('ollama')) return 'local';
-  // Direct key match
+  if (clean === 'ollama' || clean.includes('ollama') || clean.includes('llama') || clean === 'local') return 'ollama';
+  if (clean === 'custom' || clean.includes('custom'))        return 'custom';
   if (PROVIDERS_MAP[clean]) return clean;
   return null;
 }
 
-/**
- * Returns the display label for a provider key, including tick and (active) markers.
- * @param {string}  key        Provider key (e.g. 'google').
- * @param {AuthConfig}  authConfig Loaded auth configuration.
- * @returns {string}
- */
 function providerLabel(key: string, authConfig: AuthConfig): string {
   const meta        = PROVIDERS_MAP[key];
   const isSetup     = !!(authConfig.providers && authConfig.providers[key]);
@@ -112,13 +95,6 @@ function providerLabel(key: string, authConfig: AuthConfig): string {
   return `${tick} ${meta.name}${activeSufx}`;
 }
 
-// ─── Flat Provider List Printer ───────────────────────────────────────────────
-
-/**
- * Prints a non-interactive annotated list of all providers.
- * Used after: invalid provider arg, successful provider switch.
- * @param {AuthConfig} authConfig Loaded auth configuration.
- */
 function printProviderList(authConfig: AuthConfig): void {
   ui.log(formatSecondary('\nAvailable providers:'));
   for (const key of PROVIDER_KEYS) {
@@ -141,12 +117,6 @@ function printProviderList(authConfig: AuthConfig): void {
 
 // ─── Interactive Selector ─────────────────────────────────────────────────────
 
-/**
- * Interactive arrow-key provider selector.
- * Renders each item with tick + (active) markers.
- * @param {AuthConfig} authConfig Loaded auth configuration.
- * @returns {Promise<string>} Resolves with the selected provider key.
- */
 async function selectProvider(authConfig: AuthConfig): Promise<string> {
   if (!process.stdin.isTTY) {
     throw new Error('stdin is not a TTY. Cannot select provider.');
@@ -169,13 +139,6 @@ async function selectProvider(authConfig: AuthConfig): Promise<string> {
 
 // ─── Credential Input Form ────────────────────────────────────────────────────
 
-/**
- * Custom prompt that keeps an existing value if the user presses Enter without typing.
- * @param {string} label       The prompt text.
- * @param {string} existingVal Existing value to preserve on blank input.
- * @param {string} [defaultVal] Fallback shown when no existing value exists.
- * @returns {Promise<string>}
- */
 async function askWithFallback(
   label: string,
   existingVal: string = '',
@@ -200,32 +163,32 @@ async function askWithFallback(
   });
 }
 
-/**
- * Runs the credential input form for a given provider key.
- * Pre-fills from existing config if available. API key is kept if Enter pressed blank.
- * @param {string} providerKey   Canonical provider key.
- * @param {AuthConfig} authConfig    Loaded auth configuration (mutated).
- */
 async function runCredentialForm(providerKey: string, authConfig: AuthConfig): Promise<void> {
   const meta     = PROVIDERS_MAP[providerKey];
-  const existing = authConfig.providers[providerKey] || {};
+  const existing = authConfig.providers[providerKey] || {} as Partial<Config>;
 
   ui.log(formatHeader(`\nConfiguring ${meta.name}...`));
 
   let config: Config = {
     model_type:    meta.type,
-    model_name:    existing.model_name    || '',
-    model_url:     existing.model_url     || meta.url,
-    model_api_key: existing.model_api_key || '',
+    model_name:    (existing as Config).model_name    || '',
+    model_url:     (existing as Config).model_url     || meta.url,
+    model_api_key: (existing as Config).model_api_key || '',
   };
 
-  if (providerKey === 'local') {
-    config.model_url = await askWithFallback('Local Endpoint URL', existing.model_url, meta.url, false, true);
-    config.model_name    = await askWithFallback('Local Model Name', existing.model_name, meta.defaultModel);
-    config.model_api_key = await askWithFallback('Local API Key', existing.model_api_key, 'sk-no-key-required');
+  if (providerKey === 'ollama') {
+    // Ollama: URL is customizable, key is not needed
+    config.model_url     = await askWithFallback('Ollama Endpoint URL', (existing as Config).model_url, meta.url, false, true);
+    config.model_name    = await askWithFallback('Model Name', (existing as Config).model_name, meta.defaultModel, false, true);
+    config.model_api_key = 'ollama'; // Ollama doesn't require a real API key
+  } else if (providerKey === 'custom') {
+    // Custom: everything is user-supplied
+    config.model_url     = await askWithFallback('Base URL', (existing as Config).model_url, '', false, true);
+    config.model_name    = await askWithFallback('Model Name', (existing as Config).model_name, '', false, true);
+    config.model_api_key = await askWithFallback('API Key', (existing as Config).model_api_key, '', true, true);
   } else {
-    config.model_name    = await askWithFallback(`${meta.name} Model Name`, existing.model_name, meta.defaultModel);
-    config.model_api_key = await askWithFallback(`${meta.name} API Key`, existing.model_api_key, '', true, true);
+    config.model_name    = await askWithFallback(`${meta.name} Model Name`, (existing as Config).model_name, meta.defaultModel);
+    config.model_api_key = await askWithFallback(`${meta.name} API Key`, (existing as Config).model_api_key, '', true, true);
   }
 
   authConfig.providers[providerKey] = config;
@@ -235,34 +198,20 @@ async function runCredentialForm(providerKey: string, authConfig: AuthConfig): P
 
 // ─── Main Entry ───────────────────────────────────────────────────────────────
 
-/**
- * Entry point for `cwk --login [provider]`.
- *
- * Behaviour:
- *   cwk --login                → Interactive selector (ticks + active markers) → credential form (always)
- *   cwk --login <valid key>    → If configured: switch active, print list, exit.
- *                                If NOT configured: run credential form directly.
- *   cwk --login <invalid key>  → Print error + flat annotated list, exit.
- *
- * @param {string[]} args CLI arguments passed after --login / -l.
- */
 export async function runLoginWizard(args: string[] = []): Promise<void> {
   const authConfig  = loadAuthFile();
   const passedArg   = args[0] ? args[0].trim() : null;
 
   try {
-    // ── Branch A: Argument supplied ──────────────────────────────────────────
     if (passedArg) {
       const key = normalizeProviderKey(passedArg);
 
-      // A1. Invalid provider
       if (!key) {
         ui.log(formatError(`Unknown provider: '${passedArg}'.`));
         printProviderList(authConfig);
         return;
       }
 
-      // A2. Valid + already configured → switch active, print list, exit
       if (authConfig.providers[key]) {
         authConfig.active = key;
         saveAuthFile(authConfig);
@@ -272,7 +221,6 @@ export async function runLoginWizard(args: string[] = []): Promise<void> {
         return;
       }
 
-      // A3. Valid but NOT configured → run credential form directly
       ui.log(formatSecondary(`Provider '${PROVIDERS_MAP[key].name}' is not set up yet. Starting setup...`));
       await runCredentialForm(key, authConfig);
       printProviderList(authConfig);
@@ -280,7 +228,6 @@ export async function runLoginWizard(args: string[] = []): Promise<void> {
       return;
     }
 
-    // ── Branch B: No argument → interactive selector ─────────────────────────
     const selectedKey = await selectProvider(authConfig);
     await runCredentialForm(selectedKey, authConfig);
     printProviderList(authConfig);

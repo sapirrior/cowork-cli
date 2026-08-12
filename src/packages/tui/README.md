@@ -1,6 +1,6 @@
-# TUI Package (`@haiku/tui`)
+# TUI Package (`@sapirror/sonnet-cli` — tui)
 
-The `tui` package implements a state-driven, flicker-free terminal rendering engine for `cowork-cli`.
+The `tui` package implements a state-driven, flicker-free terminal rendering engine for Sonnet CLI.
 
 ## 🏗️ Architecture
 
@@ -32,25 +32,41 @@ The `tui` package implements a state-driven, flicker-free terminal rendering eng
 
 ## 🧩 Components
 
-- **`DocumentTree.ts`**: Owns the ordered tree of `ComponentNode` items (`TextNode`, `Spinner`, `InputBox`, `SelectionList`).
-- **`FrameBuffer.ts`**: Pure viewport computation engine. Computes `DocumentFrame`, max scroll bounds, and line wrapping for arbitrary document heights.
-- **`StateRenderer.ts`**: Atomic frame replacement engine. Clears the Alternate Screen Buffer top-left (`\x1b[H\x1b[J`) under synchronized output (`\x1b[?2026h` / `\x1b[?2026l`).
-- **`TerminalEngine.ts`**: Orchestrates interactive lifecycle, 50ms debounced window resize (`SIGWINCH`), mouse wheel + trackpad natural scrolling (`\x1b[?1007h`), Arrow/PageUp/PageDown/Home/End keys, and primary scrollback history flushing upon exit (`flushHistoryToPrimaryScreen`).
-- **`HistoryStore.ts`**: Retained-state memory store preserving all committed session output.
+- **`DocumentTree.ts`**: Owns the ordered tree of `ComponentNode` items.
+- **`FrameBuffer.ts`**: Pure viewport computation engine.
+- **`StateRenderer.ts`**: Atomic frame replacement engine.
+- **`TerminalEngine.ts`**: Orchestrates interactive lifecycle, resize, scroll, and mouse.
+- **`HistoryStore.ts`**: Retained-state memory store for all committed session output.
 
-## 🚀 Usage Example
+## 🧩 UI Components (`engine/components/`)
+
+| Component | Description |
+| :--- | :--- |
+| `Spinner.ts` | Animated spinner with rotating thought phrases |
+| `InputBox.ts` | Text input widget with cursor tracking and wrapping |
+| `SelectionList.ts` | Arrow-key navigable selection list |
+| `ProviderSelector.ts` | Provider login selector |
+| `ToolConfirmationCard.ts` | Lean, interactive tool confirmation card with content showcase, yellow vertical left border, and keybindings (`y`/`n`/`Enter`/`Esc`/`Tab`/`Ctrl+Y`/`Ctrl+N`/`Ctrl+E`/`Arrow keys`) |
+
+## 🚀 Usage
 
 ```typescript
-import ui from './ui/main.js';
+import { ui } from './ui/main.js';
 
-ui.start('Analyzing directory...');
-ui.log('Scanning package.json');
-ui.stop('Directory analyzed');
+// Tool confirmation with content showcase preview
+const { confirmed } = await ui.confirmTool({
+  toolName: 'writeFile',
+  action: 'Create file',
+  target: 'src/utils/helper.ts (10 lines)',
+  details: ['export function test() { return true; }'],
+});
 
-const choice = await ui.askSelection('Choose action:', ['Continue', 'Exit']);
+// Prompt query output
+ui.prompt(formatPromptQuery(query));
 ```
 
 ## 📜 Terminal Invariants & Safety
 
-1. **Alternate Screen Execution**: Interactive components run inside the Alternate Screen Buffer (`\x1b[?1049h`). Resizing or zooming (`Ctrl+` / `Ctrl-`) reflows document lines with zero ghost lines or scrollback corruption.
-2. **Primary History Flush**: On process exit, the CLI exits Alternate Screen (`\x1b[?1049l`) and flushes `HistoryStore` content directly to standard `stdout`, leaving a single clean execution log in standard terminal scrollback.
+1. **Alternate Screen**: Interactive components run inside `\x1b[?1049h`.
+2. **History Flush**: On exit, CLI flushes `HistoryStore` to primary scrollback (omitting `logo` and `prompt` entries to keep main scrollback clean).
+3. **Component Independence**: Each component in `engine/components/` is fully self-contained and extends `Component` base class.
