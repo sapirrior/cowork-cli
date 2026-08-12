@@ -112,13 +112,8 @@ export default class ToolConfirmationCard extends Component<ToolConfirmationProp
 
     if (details && details.length > 0) {
       if (expanded) {
-        const previewLimit = 8;
-        const visibleDetails = details.slice(0, previewLimit);
-        for (const line of visibleDetails) {
+        for (const line of details) {
           lines.push(`  ${yellowBar} ${formatPreviewLine(line, language)}`);
-        }
-        if (details.length > previewLimit) {
-          lines.push(`  ${yellowBar} ${rgb(silverColor, `... (${details.length - previewLimit} more lines)`)}`);
         }
       } else {
         lines.push(`  ${yellowBar} ${dim(`(preview hidden · Tab or e to expand ${details.length} lines)`)}`);
