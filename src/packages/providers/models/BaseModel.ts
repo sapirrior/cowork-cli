@@ -70,6 +70,8 @@ export default class BaseModel {
   lastRequestTime: number;
   _runStartTime: number;
   _runUsage: { prompt: number; completion: number; total: number };
+  _interrupted: boolean;
+  _abortController: AbortController | null;
 
   constructor(client: OpenAI, model: string) {
     this.client = client;
@@ -79,6 +81,8 @@ export default class BaseModel {
     this.lastRequestTime = 0; // For proactive throttling
     this._runStartTime = 0;
     this._runUsage = { prompt: 0, completion: 0, total: 0 };
+    this._interrupted = false;
+    this._abortController = null;
   }
 
   /**
@@ -95,6 +99,8 @@ export default class BaseModel {
     // Reset per-run tracking state
     this._runStartTime = performance.now();
     this._runUsage = { prompt: 0, completion: 0, total: 0 };
+    this._interrupted = false;
+    this._abortController = null;
 
     if (systemPrompt) {
       this.addMessage('system', systemPrompt);
@@ -108,134 +114,182 @@ export default class BaseModel {
     // Print the user prompt with proper word wrapping and hanging left margin indent (alternate screen only)
     ui.prompt(formatPromptQuery(query));
     ui.prompt('');
-    
-    while (true) {
-      let turn = 0;
-      let loopFinishedCleanly = false;
 
-      while (turn < this.maxTurns) {
-        turn++;
-        
-        try {
-          ui.think();
-          const response = await this._getCompletion();
+    // Override process-level SIGINT handlers globally for the turn session
+    const sigintListeners = process.listeners('SIGINT');
+    for (const listener of sigintListeners) {
+      process.off('SIGINT', listener as any);
+    }
 
-          // Guard against empty/null choices (content filter, provider quirks).
-          const choice = response.choices?.[0];
-          if (!choice?.message) {
-            ui.stop(); // Stop thinking spinner
-            logger.error("[API Error] Received empty or malformed response (no choices).");
-            return;
-          }
-          const message = choice.message;
-          const finishReason = choice.finish_reason;
+    const localSigint = () => {
+      this._interrupted = true;
+      if (this._abortController) {
+        this._abortController.abort();
+      }
+      ui.stop();
+    };
+    process.on('SIGINT', localSigint);
 
-          // Surface meaningful finish reasons to the user instead of silent behaviour.
-          if (finishReason === 'content_filter') {
-            ui.stop(); // Stop thinking spinner
-            logger.secondary("[System]: Response was blocked by the provider's content filter.");
-            this._printStats();
-            return;
-          }
-          if (finishReason === 'length') {
-            logger.secondary("[System]: Response was truncated due to token limits.");
-          }
+    // Raw key listener on stdin to catch Ctrl+C (\u0003) while raw mode is active (TUI spinning/streaming)
+    const onRawInput = (data: Buffer) => {
+      if (data.toString() === '\u0003') {
+        localSigint();
+      }
+    };
+    if (process.stdin.isTTY) {
+      process.stdin.on('data', onRawInput);
+    }
 
-          // Let subclasses handle/format the response (e.g. Gemini thought signatures)
-          await this.handleResponse(message);
-
-          // Extract and display thinking segments and final response
-          if (message.content && message.content.trim().length > 0) {
-            const { thinking, response: responseText } = extractThinking(message.content);
-            
-            if (thinking.trim().length > 0) {
-              ui.stop(); // Stop thinking spinner before printing thinking
-              const formattedThinking = formatThinkingOnly(thinking);
-              ui.log(formattedThinking);
-            }
-
-            const hasResponse = responseText.trim().length > 0;
-            const hasTools = Array.isArray(message.tool_calls) && message.tool_calls.length > 0;
-
-            if (!hasTools) {
-              ui.stop(); // Ensure thinking spinner is stopped
-              if (hasResponse) {
-                if (thinking.trim().length > 0) {
-                  // Keep a one line space gap between thinking and response
-                  ui.log('');
-                }
-                const formattedResponse = outputFormatted(responseText);
-                ui.log(formattedResponse);
-              } else if (thinking.trim().length === 0) {
-                logger.error('[System]: Model returned an empty final response.');
-              }
-              loopFinishedCleanly = true;
-              break;
-            }
-          } else {
-            const hasTools = Array.isArray(message.tool_calls) && message.tool_calls.length > 0;
-            if (!hasTools) {
-              ui.stop();
-              logger.error('[System]: Model returned an empty final response.');
-              loopFinishedCleanly = true;
-              break;
-            }
-          }
-
-          // Execute and record tool calls (spinner transition handled inside)
-          await this._processToolCalls(message.tool_calls);
-
-        } catch (err: any) {
-          // Use ui.fail() (red dot) instead of ui.stop() (green dot) so the
-          // terminal reflects that the turn ended in error. fail() is a no-op when IDLE.
-          ui.fail();
-          const errStr = (err.message || '').toLowerCase();
-          // Deep error logging for API failures
-          if (err.status) {
-            logger.error(`[API Error] Status: ${err.status}`);
-            if (err.response?.data) {
-               logger.error(`[API Error] Details: ${JSON.stringify(err.response.data)}`);
-            }
-          } else if (err.name === 'AbortError' || errStr.includes('timeout')) {
-            logger.error(`[Timeout Error]: The AI took too long to respond (60s).`);
-          } else {
-            logger.error(`[Error]: ${err.message || err}`);
-          }
-          throw err;
+    try {
+      while (true) {
+        if (this._interrupted) {
+          break;
         }
+
+        let turn = 0;
+        let loopFinishedCleanly = false;
+
+        while (turn < this.maxTurns) {
+          if (this._interrupted) {
+            break;
+          }
+          turn++;
+          
+          try {
+            ui.think();
+            const response = await this._getCompletion();
+
+            // Guard against empty/null choices (content filter, provider quirks).
+            const choice = response.choices?.[0];
+            if (!choice?.message) {
+              ui.stop(); // Stop thinking spinner
+              logger.error("[API Error] Received empty or malformed response (no choices).");
+              return;
+            }
+            const message = choice.message;
+            const finishReason = choice.finish_reason;
+
+            // Surface meaningful finish reasons to the user instead of silent behaviour.
+            if (finishReason === 'content_filter') {
+              ui.stop(); // Stop thinking spinner
+              logger.secondary("[System]: Response was blocked by the provider's content filter.");
+              this._printStats();
+              return;
+            }
+            if (finishReason === 'length') {
+              logger.secondary("[System]: Response was truncated due to token limits.");
+            }
+
+            // Let subclasses handle/format the response (e.g. Gemini thought signatures)
+            await this.handleResponse(message);
+
+            // Extract and display thinking segments and final response
+            if (message.content && message.content.trim().length > 0) {
+              const { thinking, response: responseText } = extractThinking(message.content);
+              
+              if (thinking.trim().length > 0) {
+                ui.stop(); // Stop thinking spinner before printing thinking
+                const formattedThinking = formatThinkingOnly(thinking);
+                ui.log(formattedThinking);
+              }
+
+              const hasResponse = responseText.trim().length > 0;
+              const hasTools = Array.isArray(message.tool_calls) && message.tool_calls.length > 0;
+
+              if (!hasTools) {
+                ui.stop(); // Ensure thinking spinner is stopped
+                if (hasResponse) {
+                  if (thinking.trim().length > 0) {
+                    // Keep a one line space gap between thinking and response
+                    ui.log('');
+                  }
+                  const formattedResponse = outputFormatted(responseText);
+                  ui.log(formattedResponse);
+                } else if (thinking.trim().length === 0) {
+                  logger.error('[System]: Model returned an empty final response.');
+                }
+                loopFinishedCleanly = true;
+                break;
+              }
+            } else {
+              const hasTools = Array.isArray(message.tool_calls) && message.tool_calls.length > 0;
+              if (!hasTools) {
+                ui.stop();
+                logger.error('[System]: Model returned an empty final response.');
+                loopFinishedCleanly = true;
+                break;
+              }
+            }
+
+            // Execute and record tool calls (spinner transition handled inside)
+            await this._processToolCalls(message.tool_calls);
+
+          } catch (err: any) {
+            ui.fail();
+            if (this._interrupted || err.name === 'AbortError') {
+              ui.stop();
+              break;
+            }
+            const errStr = (err.message || '').toLowerCase();
+            // Deep error logging for API failures
+            if (err.status) {
+              logger.error(`[API Error] Status: ${err.status}`);
+              if (err.response?.data) {
+                 logger.error(`[API Error] Details: ${JSON.stringify(err.response.data)}`);
+              }
+            } else if (err.name === 'AbortError' || errStr.includes('timeout')) {
+              logger.secondary(`[Timeout Error]: The AI took too long to respond (60s).`);
+            } else {
+              logger.error(`[Error]: ${err.message || err}`);
+            }
+            throw err;
+          }
+        }
+
+        if (!loopFinishedCleanly && turn >= this.maxTurns && !this._interrupted) {
+          logger.secondary("[System]: Reached maximum conversation turns. Ending session.");
+        }
+
+        this._printStats();
+
+        // Reset interrupted flag for the follow-up wait state
+        this._interrupted = false;
+
+        // Wait for exit or follow-up request
+        const action = await ui.waitForExit();
+        if (action === 'exit') {
+          return;
+        }
+
+        // If user selected 'followup', ask for query input
+        let followUp = '';
+        try {
+          followUp = await ui.askFollowUp();
+        } catch (e: any) {
+          // If user hits Ctrl+C or cancels the input prompt, exit cleanly
+          return;
+        }
+
+        if (!followUp || followUp.toLowerCase() === 'q') {
+          return;
+        }
+
+        // Record the follow-up prompt
+        this.addMessage('user', followUp);
+        // Log spacing and a divider before next response
+        ui.log('');
+        // Reset start time for accurate statistics on the follow-up execution
+        this._runStartTime = performance.now();
       }
-
-      if (!loopFinishedCleanly && turn >= this.maxTurns) {
-        logger.secondary("[System]: Reached maximum conversation turns. Ending session.");
+    } finally {
+      // Clean up event listeners and restore default SIGINT behaviors on shutdown
+      if (process.stdin.isTTY) {
+        process.stdin.off('data', onRawInput);
       }
-
-      this._printStats();
-
-      // Wait for exit or follow-up request
-      const action = await ui.waitForExit();
-      if (action === 'exit') {
-        return;
+      process.off('SIGINT', localSigint);
+      for (const listener of sigintListeners) {
+        process.on('SIGINT', listener as any);
       }
-
-      // If user selected 'followup', ask for query input
-      let followUp = '';
-      try {
-        followUp = await ui.askFollowUp();
-      } catch (e: any) {
-        // If user hits Ctrl+C or cancels the input prompt, exit cleanly
-        return;
-      }
-
-      if (!followUp || followUp.toLowerCase() === 'q') {
-        return;
-      }
-
-      // Record the follow-up prompt
-      this.addMessage('user', followUp);
-      // Log spacing and a divider before next response
-      ui.log('');
-      // Reset start time for accurate statistics on the follow-up execution
-      this._runStartTime = performance.now();
     }
   }
 
@@ -270,56 +324,95 @@ export default class BaseModel {
         let streamingComponent: StreamingText | null = null;
         let finishReason = 'stop';
 
-        for await (const chunk of response as any) {
-          const choice = chunk.choices?.[0];
-          if (!choice) continue;
-
-          if (choice.finish_reason) {
-            finishReason = choice.finish_reason;
+        let interrupted = false;
+        const onStreamInput = (data: Buffer) => {
+          const str = data.toString();
+          if (str === '\u0003') {
+            interrupted = true;
           }
+        };
 
-          // 1. Accumulate and live render text content
-          if (choice.delta?.content) {
-            const text = choice.delta.content;
-            fullContent += text;
+        // Temporarily override process-level SIGINT listeners to prevent immediate program exit on Ctrl+C during streaming
+        const sigintListeners = process.listeners('SIGINT');
+        for (const listener of sigintListeners) {
+          process.off('SIGINT', listener as any);
+        }
+        const localSigint = () => {
+          interrupted = true;
+        };
+        process.on('SIGINT', localSigint);
+
+        if (process.stdin.isTTY) {
+          process.stdin.setRawMode(true);
+          process.stdin.on('data', onStreamInput);
+        }
+
+        try {
+          for await (const chunk of response as any) {
+            if (interrupted) {
+              break;
+            }
             
-            if (!streamingComponent) {
-              ui.stop(); // Stop thinking spinner
-              streamingComponent = new StreamingText();
-              ui.engine.mount(streamingComponent);
-            }
-            streamingComponent.setRawText(fullContent);
-          }
+            const choice = chunk.choices?.[0];
+            if (!choice) continue;
 
-          // 2. Accumulate tool calls
-          if (choice.delta?.tool_calls) {
-            if (!streamingComponent) {
-              ui.stop(); // Stop thinking spinner
+            if (choice.finish_reason) {
+              finishReason = choice.finish_reason;
             }
-            for (let i = 0; i < choice.delta.tool_calls.length; i++) {
-              const tc = choice.delta.tool_calls[i];
-              const idx = tc.index !== undefined ? tc.index : i;
+
+            // 1. Accumulate and live render text content
+            if (choice.delta?.content) {
+              const text = choice.delta.content;
+              fullContent += text;
               
-              if (!toolCallsAccumulator[idx]) {
-                toolCallsAccumulator[idx] = {
-                  id: '',
-                  type: 'function',
-                  function: { name: '', arguments: '' }
-                };
+              if (!streamingComponent) {
+                ui.stop(); // Stop thinking spinner
+                streamingComponent = new StreamingText();
+                ui.engine.mount(streamingComponent);
               }
-              // Copy all provider-specific custom properties (like extra_content containing thought_signature)
-              for (const [key, val] of Object.entries(tc)) {
-                if (key !== 'index' && key !== 'function') {
-                  toolCallsAccumulator[idx][key] = val;
+              streamingComponent.setRawText(fullContent);
+            }
+
+            // 2. Accumulate tool calls
+            if (choice.delta?.tool_calls) {
+              if (!streamingComponent) {
+                ui.stop(); // Stop thinking spinner
+              }
+              for (let i = 0; i < choice.delta.tool_calls.length; i++) {
+                const tc = choice.delta.tool_calls[i];
+                const idx = tc.index !== undefined ? tc.index : i;
+                
+                if (!toolCallsAccumulator[idx]) {
+                  toolCallsAccumulator[idx] = {
+                    id: '',
+                    type: 'function',
+                    function: { name: '', arguments: '' }
+                  };
+                }
+                // Copy all provider-specific custom properties (like extra_content containing thought_signature)
+                for (const [key, val] of Object.entries(tc)) {
+                  if (key !== 'index' && key !== 'function') {
+                    toolCallsAccumulator[idx][key] = val;
+                  }
+                }
+                if (tc.function?.name) {
+                  toolCallsAccumulator[idx].function.name = tc.function.name;
+                }
+                if (tc.function?.arguments) {
+                  toolCallsAccumulator[idx].function.arguments += tc.function.arguments;
                 }
               }
-              if (tc.function?.name) {
-                toolCallsAccumulator[idx].function.name = tc.function.name;
-              }
-              if (tc.function?.arguments) {
-                toolCallsAccumulator[idx].function.arguments += tc.function.arguments;
-              }
             }
+          }
+        } finally {
+          if (process.stdin.isTTY) {
+            process.stdin.off('data', onStreamInput);
+            process.stdin.setRawMode(false);
+          }
+          // Restore original SIGINT listeners
+          process.off('SIGINT', localSigint);
+          for (const listener of sigintListeners) {
+            process.on('SIGINT', listener as any);
           }
         }
 
@@ -341,7 +434,7 @@ export default class BaseModel {
         return {
           choices: [
             {
-              finish_reason: tool_calls.length > 0 ? 'tool_calls' : finishReason,
+              finish_reason: tool_calls.length > 0 ? 'tool_calls' : (interrupted ? 'stop' : finishReason),
               message: {
                 role: 'assistant',
                 content: fullContent,
