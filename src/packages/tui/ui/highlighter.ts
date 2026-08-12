@@ -107,6 +107,7 @@ export function detectLanguage(target: string, content: string[] = []): string {
   
   // Quick heuristic content check
   const joined = content.slice(0, 5).join('\n');
+  if (joined.startsWith('#!') && (joined.includes('sh') || joined.includes('bash') || joined.includes('zsh'))) return 'bash';
   if (joined.includes('import ') || (joined.includes('const ') && joined.includes('='))) return 'javascript';
   if (joined.includes('def ') && joined.includes(':')) return 'python';
   if (joined.includes('package main')) return 'go';

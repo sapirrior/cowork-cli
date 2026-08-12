@@ -107,7 +107,8 @@ export default class ToolConfirmationCard extends Component<ToolConfirmationProp
 
     // Content preview section framed by a bright Yellow vertical left border (│) with clean white content
     const yellowBar = rgb(amberColor, '│');
-    const language = detectLanguage(target, details);
+    const isCommand = toolName.toLowerCase().includes('command') || toolName.toLowerCase().includes('exec');
+    const language = isCommand ? 'bash' : detectLanguage(target, details);
 
     if (details && details.length > 0) {
       if (expanded) {
