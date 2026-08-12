@@ -70,19 +70,18 @@ class UIEngine {
     if (!process.stdin.isTTY) return;
 
     this.log('');
-    this.log(format.dim('(press any key to exit)'));
+    this.log(format.dim('(press q to exit)'));
 
     return new Promise<void>((resolve) => {
       const onData = (chunk: Buffer) => {
         const str = chunk.toString();
 
-        // Ignore mouse tracking events (\x1b[<...)
-        if (str.includes('\x1b[<')) {
-          return;
+        // Exit only when q, Q, or Ctrl+C is pressed.
+        // This allows arrow keys, mouse wheel, and PageUp/PageDown to scroll the viewport history cleanly.
+        if (str.toLowerCase() === 'q' || str === '\u0003') {
+          cleanup();
+          resolve();
         }
-
-        cleanup();
-        resolve();
       };
 
       const cleanup = () => {
