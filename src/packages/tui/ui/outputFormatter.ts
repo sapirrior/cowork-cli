@@ -540,4 +540,134 @@ export function formatPromptQuery(query: string, overrideWidth?: number): string
   return formattedLines.join('\n');
 }
 
+/**
+ * State-based classifier that extracts thinking segments and main response segments
+ * from raw assistant messages. It supports nested, multiple, and broken tags (e.g. <think>, <thought>, <reasoning>).
+ */
+export function extractThinking(text: string): { thinking: string; response: string } {
+  if (!text) return { thinking: '', response: '' };
+
+  const tagRegex = /<(\/?\\?)(think|thin|thnk|thinking|thought|reasoning|reflection|thought_process)\b[^>]*>/gi;
+  
+  let lastIndex = 0;
+  let openTagsCount = 0;
+  
+  const thinkingParts: string[] = [];
+  const responseParts: string[] = [];
+  
+  let match;
+  tagRegex.lastIndex = 0;
+  
+  while ((match = tagRegex.exec(text)) !== null) {
+    const matchIndex = match.index;
+    const isEndSlash = match[1] !== '';
+    
+    const contentSegment = text.slice(lastIndex, matchIndex);
+    
+    if (openTagsCount > 0) {
+      thinkingParts.push(contentSegment);
+    } else {
+      responseParts.push(contentSegment);
+    }
+    
+    if (isEndSlash) {
+      if (openTagsCount > 0) {
+        openTagsCount--;
+      }
+    } else {
+      openTagsCount++;
+    }
+    
+    lastIndex = tagRegex.lastIndex;
+  }
+  
+  const remaining = text.slice(lastIndex);
+  if (openTagsCount > 0) {
+    thinkingParts.push(remaining);
+  } else {
+    responseParts.push(remaining);
+  }
+  
+  return {
+    thinking: thinkingParts.join(''),
+    response: responseParts.join('')
+  };
+}
+
+/**
+ * Format thinking text as grey plain text with word wrapping.
+ */
+export function formatThinkingOnly(thinkingText: string, overrideWidth?: number): string {
+  if (!thinkingText) return '';
+
+  let rawWidth = overrideWidth || process.stdout.columns || 80;
+  if (typeof rawWidth !== 'number' || isNaN(rawWidth) || rawWidth < 10) {
+    rawWidth = 80;
+  }
+  const width = Math.max(10, rawWidth - 2);
+
+  const lines = thinkingText.split('\n');
+  const wrappedLines: string[] = [];
+
+  for (const line of lines) {
+    const wrappedSegments = wrapStringPlain(line, width);
+    for (const segment of wrappedSegments) {
+      wrappedLines.push(`${colors.dim}${segment}${reset}`);
+    }
+  }
+
+  return wrappedLines.join('\n');
+}
+
+// Plain string wrapping helper (without ANSI escape sequence handling overhead or inline formatting)
+function wrapStringPlain(content: string, wrapWidth: number): string[] {
+  const safeWidth = Math.max(5, wrapWidth);
+  const trimmed = content.trimEnd();
+  if (trimmed.length <= safeWidth) return [trimmed];
+
+  const tokens = trimmed.split(/(\s+)/);
+  const result: string[] = [];
+  let currentLine = '';
+
+  for (const token of tokens) {
+    if (!token) continue;
+
+    const tokenLen = token.length;
+    const currentLineLen = currentLine.length;
+
+    if (currentLineLen + tokenLen > safeWidth) {
+      if (tokenLen > safeWidth && !/^\s+$/.test(token)) {
+        if (currentLine) {
+          result.push(currentLine.trimEnd());
+          currentLine = '';
+        }
+        
+        let remainingWord = token;
+        while (remainingWord.length > safeWidth) {
+          result.push(remainingWord.substring(0, safeWidth));
+          remainingWord = remainingWord.substring(safeWidth);
+        }
+        currentLine = remainingWord;
+      } 
+      else if (/^\s+$/.test(token)) {
+        if (currentLine) {
+          result.push(currentLine.trimEnd());
+          currentLine = '';
+        }
+      } 
+      else {
+        if (currentLine) {
+          result.push(currentLine.trimEnd());
+        }
+        currentLine = token;
+      }
+    } else {
+      currentLine += token;
+    }
+  }
+  
+  if (currentLine) result.push(currentLine.trimEnd());
+  return result.length > 0 ? result : [''];
+}
+
 export const outputFormatted = formatOutput;

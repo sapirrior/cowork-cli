@@ -63,6 +63,13 @@ const { confirmed } = await ui.confirmTool({
 
 // Prompt query output
 ui.prompt(formatPromptQuery(query));
+
+// Extract and format model thinking content (grey formatted, word-wrapped, no markdown)
+const { thinking, response } = extractThinking(message.content);
+if (thinking) {
+  const formattedThinking = formatThinkingOnly(thinking);
+  ui.log(formattedThinking);
+}
 ```
 
 ## 📜 Terminal Invariants & Safety

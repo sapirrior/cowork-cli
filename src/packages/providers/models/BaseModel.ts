@@ -1,6 +1,6 @@
 import { toolDefinitions, dispatchTool, isInteractiveTool, isKnownTool } from '../../agent/index.js';
 import { logger, formatMain, formatDim } from '../../utils/index.js';
-import { ui, outputFormatted, formatPromptQuery } from '../../tui/index.js';
+import { ui, outputFormatted, formatPromptQuery, extractThinking, formatThinkingOnly } from '../../tui/index.js';
 import { getLogoLines } from '../../../assets/logo.js';
 import { OpenAI } from 'openai';
 
@@ -141,18 +141,44 @@ export default class BaseModel {
         // Let subclasses handle/format the response (e.g. Gemini thought signatures)
         await this.handleResponse(message);
 
-        // Exit loop if no tool calls are requested (Final Answer)
-        if (!message.tool_calls || message.tool_calls.length === 0) {
-          ui.stop(); // Stop thinking spinner with green dot (Thought)
-          if (message.content && message.content.trim().length > 0) {
-            const formatted = outputFormatted(message.content);
-            ui.log(formatted);
-          } else {
-            logger.error('[System]: Model returned an empty final response.');
+        // Extract and display thinking segments and final response
+        if (message.content && message.content.trim().length > 0) {
+          const { thinking, response } = extractThinking(message.content);
+          
+          if (thinking.trim().length > 0) {
+            ui.stop(); // Stop thinking spinner before printing thinking
+            const formattedThinking = formatThinkingOnly(thinking);
+            ui.log(formattedThinking);
           }
-          this._printStats();
-          await ui.waitForExit();
-          return;
+
+          const hasResponse = response.trim().length > 0;
+          const hasTools = Array.isArray(message.tool_calls) && message.tool_calls.length > 0;
+
+          if (!hasTools) {
+            ui.stop(); // Ensure thinking spinner is stopped
+            if (hasResponse) {
+              if (thinking.trim().length > 0) {
+                // Keep a one line space gap between thinking and response
+                ui.log('');
+              }
+              const formattedResponse = outputFormatted(response);
+              ui.log(formattedResponse);
+            } else if (thinking.trim().length === 0) {
+              logger.error('[System]: Model returned an empty final response.');
+            }
+            this._printStats();
+            await ui.waitForExit();
+            return;
+          }
+        } else {
+          const hasTools = Array.isArray(message.tool_calls) && message.tool_calls.length > 0;
+          if (!hasTools) {
+            ui.stop();
+            logger.error('[System]: Model returned an empty final response.');
+            this._printStats();
+            await ui.waitForExit();
+            return;
+          }
         }
 
         // Execute and record tool calls (spinner transition handled inside)
