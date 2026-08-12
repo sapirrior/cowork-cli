@@ -169,6 +169,21 @@ export default class BaseModel {
             const message = choice.message;
             const finishReason = choice.finish_reason;
 
+            if (this._interrupted) {
+              ui.stop();
+              if (message.content && message.content.trim().length > 0) {
+                const { thinking, response: responseText } = extractThinking(message.content);
+                if (thinking.trim().length > 0) {
+                  ui.log(formatThinkingOnly(thinking));
+                }
+                if (responseText.trim().length > 0) {
+                  if (thinking.trim().length > 0) ui.log('');
+                  ui.log(outputFormatted(responseText));
+                }
+              }
+              break;
+            }
+
             // Surface meaningful finish reasons to the user instead of silent behaviour.
             if (finishReason === 'content_filter') {
               ui.stop(); // Stop thinking spinner
@@ -223,6 +238,10 @@ export default class BaseModel {
 
             // Execute and record tool calls (spinner transition handled inside)
             await this._processToolCalls(message.tool_calls);
+
+            if (this._interrupted) {
+              break;
+            }
 
           } catch (err: any) {
             ui.fail();
