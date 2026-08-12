@@ -1,6 +1,6 @@
 import { toolDefinitions, dispatchTool, isInteractiveTool, isKnownTool } from '../../agent/index.js';
 import { logger, formatMain, formatDim } from '../../utils/index.js';
-import { ui, outputFormatted, formatPromptQuery, extractThinking, formatThinkingOnly } from '../../tui/index.js';
+import { ui, outputFormatted, formatPromptQuery, extractThinking, formatThinkingOnly, StreamingText } from '../../tui/index.js';
 import { getLogoLines } from '../../../assets/logo.js';
 import { OpenAI } from 'openai';
 
@@ -209,9 +209,6 @@ export default class BaseModel {
     await ui.waitForExit();
   }
 
-  /**
-   * Private method to fetch completion with non-streaming API calls, proactive throttling, and retries.
-   */
   async _getCompletion(): Promise<any> {
     let attempt = 0;
     const maxAttempts = 6;
@@ -233,38 +230,91 @@ export default class BaseModel {
           messages: this.messages,
           tools: toolDefinitions as any,
           tool_choice: 'auto',
-          stream: false,
+          stream: true,
         });
 
         this.lastRequestTime = Date.now();
 
-        if (response.usage) {
-          this._runUsage.prompt += response.usage.prompt_tokens || 0;
-          this._runUsage.completion += response.usage.completion_tokens || 0;
-          this._runUsage.total += response.usage.total_tokens || 0;
+        let fullContent = '';
+        const toolCallsAccumulator: any[] = [];
+        let streamingComponent: StreamingText | null = null;
+        let finishReason = 'stop';
+
+        for await (const chunk of response as any) {
+          const choice = chunk.choices?.[0];
+          if (!choice) continue;
+
+          if (choice.finish_reason) {
+            finishReason = choice.finish_reason;
+          }
+
+          // 1. Accumulate and live render text content
+          if (choice.delta?.content) {
+            const text = choice.delta.content;
+            fullContent += text;
+            
+            if (!streamingComponent) {
+              ui.stop(); // Stop thinking spinner
+              streamingComponent = new StreamingText();
+              ui.engine.mount(streamingComponent);
+            }
+            streamingComponent.setRawText(fullContent);
+          }
+
+          // 2. Accumulate tool calls
+          if (choice.delta?.tool_calls) {
+            if (!streamingComponent) {
+              ui.stop(); // Stop thinking spinner
+            }
+            for (let i = 0; i < choice.delta.tool_calls.length; i++) {
+              const tc = choice.delta.tool_calls[i];
+              const idx = tc.index !== undefined ? tc.index : i;
+              
+              if (!toolCallsAccumulator[idx]) {
+                toolCallsAccumulator[idx] = {
+                  id: '',
+                  type: 'function',
+                  function: { name: '', arguments: '' }
+                };
+              }
+              // Copy all provider-specific custom properties (like extra_content containing thought_signature)
+              for (const [key, val] of Object.entries(tc)) {
+                if (key !== 'index' && key !== 'function') {
+                  toolCallsAccumulator[idx][key] = val;
+                }
+              }
+              if (tc.function?.name) {
+                toolCallsAccumulator[idx].function.name = tc.function.name;
+              }
+              if (tc.function?.arguments) {
+                toolCallsAccumulator[idx].function.arguments += tc.function.arguments;
+              }
+            }
+          }
         }
 
-        const choice = response.choices?.[0];
-        if (!choice?.message) {
-          return { choices: [] };
+        // Clean up live rendering component if it was mounted
+        if (streamingComponent) {
+          ui.engine.unmount(streamingComponent);
         }
 
-        const rawToolCalls = choice.message.tool_calls || [];
-        const tool_calls = rawToolCalls
-          .filter((tc: any) => tc.function?.name && tc.function.name.trim().length > 0 && tc.id)
-          .map((tc: any) => ({
-            id: tc.id,
-            type: 'function' as const,
-            function: { name: tc.function.name, arguments: tc.function.arguments || '{}' }
-          }));
+        const tool_calls = toolCallsAccumulator
+          .filter((tc: any) => tc && tc.function?.name && tc.function.name.trim().length > 0 && tc.id)
+          .map((tc: any) => {
+            const { ...rest } = tc;
+            if (!rest.function.arguments) {
+              rest.function.arguments = '{}';
+            }
+            return rest;
+          });
 
         return {
           choices: [
             {
-              finish_reason: choice.finish_reason || (tool_calls.length > 0 ? 'tool_calls' : 'stop'),
+              finish_reason: tool_calls.length > 0 ? 'tool_calls' : finishReason,
               message: {
                 role: 'assistant',
-                content: choice.message.content || '',
+                content: fullContent,
                 ...(tool_calls.length > 0 ? { tool_calls } : {}),
               }
             }
