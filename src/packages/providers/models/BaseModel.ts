@@ -318,13 +318,25 @@ export default class BaseModel {
     const minDelayBetweenRequests = 1000;
 
     while (attempt < maxAttempts) {
+      if (this._interrupted) {
+        throw new Error('Aborted');
+      }
+
+      this._abortController = new AbortController();
+
       try {
         if (attempt === 0) {
           const now = Date.now();
           const timeSinceLastRequest = now - this.lastRequestTime;
           if (timeSinceLastRequest < minDelayBetweenRequests) {
             const waitTime = minDelayBetweenRequests - timeSinceLastRequest;
-            await new Promise(resolve => setTimeout(resolve, waitTime));
+            await new Promise<void>((resolve, reject) => {
+              const timer = setTimeout(resolve, waitTime);
+              this._abortController!.signal.addEventListener('abort', () => {
+                clearTimeout(timer);
+                reject(new Error('Aborted'));
+              });
+            });
           }
         }
 
@@ -334,6 +346,8 @@ export default class BaseModel {
           tools: toolDefinitions as any,
           tool_choice: 'auto',
           stream: true,
+        }, {
+          signal: this._abortController.signal
         });
 
         this.lastRequestTime = Date.now();
@@ -343,95 +357,62 @@ export default class BaseModel {
         let streamingComponent: StreamingText | null = null;
         let finishReason = 'stop';
 
-        let interrupted = false;
-        const onStreamInput = (data: Buffer) => {
-          const str = data.toString();
-          if (str === '\u0003') {
-            interrupted = true;
+        // We already have turn-wide interrupt handling in BaseModel.run().
+        // Here we just stream and check if this._interrupted was flipped.
+        for await (const chunk of response as any) {
+          if (this._interrupted) {
+            break;
           }
-        };
+          
+          const choice = chunk.choices?.[0];
+          if (!choice) continue;
 
-        // Temporarily override process-level SIGINT listeners to prevent immediate program exit on Ctrl+C during streaming
-        const sigintListeners = process.listeners('SIGINT');
-        for (const listener of sigintListeners) {
-          process.off('SIGINT', listener as any);
-        }
-        const localSigint = () => {
-          interrupted = true;
-        };
-        process.on('SIGINT', localSigint);
+          if (choice.finish_reason) {
+            finishReason = choice.finish_reason;
+          }
 
-        if (process.stdin.isTTY) {
-          process.stdin.setRawMode(true);
-          process.stdin.on('data', onStreamInput);
-        }
-
-        try {
-          for await (const chunk of response as any) {
-            if (interrupted) {
-              break;
-            }
+          // 1. Accumulate and live render text content
+          if (choice.delta?.content) {
+            const text = choice.delta.content;
+            fullContent += text;
             
-            const choice = chunk.choices?.[0];
-            if (!choice) continue;
-
-            if (choice.finish_reason) {
-              finishReason = choice.finish_reason;
+            if (!streamingComponent) {
+              ui.stop(); // Stop thinking spinner
+              streamingComponent = new StreamingText();
+              ui.engine.mount(streamingComponent);
             }
+            streamingComponent.setRawText(fullContent);
+          }
 
-            // 1. Accumulate and live render text content
-            if (choice.delta?.content) {
-              const text = choice.delta.content;
-              fullContent += text;
+          // 2. Accumulate tool calls
+          if (choice.delta?.tool_calls) {
+            if (!streamingComponent) {
+              ui.stop(); // Stop thinking spinner
+            }
+            for (let i = 0; i < choice.delta.tool_calls.length; i++) {
+              const tc = choice.delta.tool_calls[i];
+              const idx = tc.index !== undefined ? tc.index : i;
               
-              if (!streamingComponent) {
-                ui.stop(); // Stop thinking spinner
-                streamingComponent = new StreamingText();
-                ui.engine.mount(streamingComponent);
+              if (!toolCallsAccumulator[idx]) {
+                toolCallsAccumulator[idx] = {
+                  id: '',
+                  type: 'function',
+                  function: { name: '', arguments: '' }
+                };
               }
-              streamingComponent.setRawText(fullContent);
-            }
-
-            // 2. Accumulate tool calls
-            if (choice.delta?.tool_calls) {
-              if (!streamingComponent) {
-                ui.stop(); // Stop thinking spinner
+              // Copy all provider-specific custom properties (like extra_content containing thought_signature)
+              for (const [key, val] of Object.entries(tc)) {
+                if (key !== 'index' && key !== 'function') {
+                  toolCallsAccumulator[idx][key] = val;
+                }
               }
-              for (let i = 0; i < choice.delta.tool_calls.length; i++) {
-                const tc = choice.delta.tool_calls[i];
-                const idx = tc.index !== undefined ? tc.index : i;
-                
-                if (!toolCallsAccumulator[idx]) {
-                  toolCallsAccumulator[idx] = {
-                    id: '',
-                    type: 'function',
-                    function: { name: '', arguments: '' }
-                  };
-                }
-                // Copy all provider-specific custom properties (like extra_content containing thought_signature)
-                for (const [key, val] of Object.entries(tc)) {
-                  if (key !== 'index' && key !== 'function') {
-                    toolCallsAccumulator[idx][key] = val;
-                  }
-                }
-                if (tc.function?.name) {
-                  toolCallsAccumulator[idx].function.name = tc.function.name;
-                }
-                if (tc.function?.arguments) {
-                  toolCallsAccumulator[idx].function.arguments += tc.function.arguments;
-                }
+              if (tc.function?.name) {
+                toolCallsAccumulator[idx].function.name = tc.function.name;
+              }
+              if (tc.function?.arguments) {
+                toolCallsAccumulator[idx].function.arguments += tc.function.arguments;
               }
             }
-          }
-        } finally {
-          if (process.stdin.isTTY) {
-            process.stdin.off('data', onStreamInput);
-            process.stdin.setRawMode(false);
-          }
-          // Restore original SIGINT listeners
-          process.off('SIGINT', localSigint);
-          for (const listener of sigintListeners) {
-            process.on('SIGINT', listener as any);
           }
         }
 
@@ -453,7 +434,7 @@ export default class BaseModel {
         return {
           choices: [
             {
-              finish_reason: tool_calls.length > 0 ? 'tool_calls' : (interrupted ? 'stop' : finishReason),
+              finish_reason: tool_calls.length > 0 ? 'tool_calls' : (this._interrupted ? 'stop' : finishReason),
               message: {
                 role: 'assistant',
                 content: fullContent,
@@ -464,6 +445,10 @@ export default class BaseModel {
         };
 
       } catch (err: any) {
+        if (this._interrupted || err.name === 'AbortError' || err.message === 'Aborted') {
+          throw new Error('Aborted');
+        }
+
         const isHttpTransient = [429, 500, 502, 503, 504].includes(err.status);
         const isNetTransient = TRANSIENT_NET_CODES.has(err.code);
         const isTransient = isHttpTransient || isNetTransient;
@@ -476,11 +461,19 @@ export default class BaseModel {
 
           const errLabel = err.status ?? err.code ?? 'Network error';
           ui.update(`${errLabel}. Retrying in ${(finalDelay/1000).toFixed(1)}s`);
-          await new Promise(resolve => setTimeout(resolve, finalDelay));
+          await new Promise<void>((resolve, reject) => {
+            const timer = setTimeout(resolve, finalDelay);
+            this._abortController!.signal.addEventListener('abort', () => {
+              clearTimeout(timer);
+              reject(new Error('Aborted'));
+            });
+          });
           ui.update('Thinking');
           continue;
         }
         throw err;
+      } finally {
+        this._abortController = null;
       }
     }
 
