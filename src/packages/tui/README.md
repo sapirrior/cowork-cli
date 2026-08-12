@@ -1,4 +1,4 @@
-# TUI Package (`@sapirror/sonnet-cli` — tui)
+# TUI Package (`@sapirrior/sonnet-cli` — tui)
 
 The `tui` package implements a state-driven, flicker-free terminal rendering engine for Sonnet CLI.
 

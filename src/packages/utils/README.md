@@ -1,4 +1,4 @@
-# Utilities Package (`@sapirror/sonnet-cli` — utils)
+# Utilities Package (`@sapirrior/sonnet-cli` — utils)
 
 This package contains low-level helpers for terminal color formatting, path safety (`safePath`), CLI help messages, and gitignore rule parsing.
 

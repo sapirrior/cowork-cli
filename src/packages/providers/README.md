@@ -1,4 +1,4 @@
-# Provider Package (`@sapirror/sonnet-cli` — providers)
+# Provider Package (`@sapirrior/sonnet-cli` — providers)
 
 This package encapsulates interactions with AI model services, handles OpenAI client instantiations, manages context history, handles streaming completions with real-time TUI feedback and connection retries, and executes the conversation loop.
 

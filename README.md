@@ -1,4 +1,4 @@
-# 🌿 Sonnet CLI (`@sapirror/sonnet-cli`)
+# 🌿 Sonnet CLI
 
 <p align="center">
   <pre>
@@ -16,7 +16,7 @@ An autonomous AI engineering co-worker that lives in your terminal, investigates
 
 ### 📦 Installation
 ```bash
-npm install -g @sapirror/sonnet-cli
+npm install -g @sapirrior/sonnet-cli
 ```
 
 ### 🔑 Configuration

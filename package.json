@@ -1,6 +1,9 @@
 {
-  "name": "@sapirror/sonnet-cli",
+  "name": "@sapirrior/sonnet-cli",
   "version": "1.0.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "description": "Sonnet — an AI coding agent for your terminal",
   "bin": {
     "sonnet": "dist/bin/cli.js",
