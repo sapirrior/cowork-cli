@@ -58,6 +58,10 @@ class UIEngine {
     return prompt.ask(this, question);
   }
 
+  async askFollowUp(): Promise<string> {
+    return prompt.askFollowUp(this);
+  }
+
   async confirm(question: string, options?: prompt.ToolConfirmOptions): Promise<{ confirmed: boolean; dismissed?: boolean }> {
     return prompt.confirm(this, question, options);
   }
@@ -66,21 +70,22 @@ class UIEngine {
     return prompt.confirmTool(this, options);
   }
 
-  async waitForExit(): Promise<void> {
-    if (!process.stdin.isTTY) return;
+  async waitForExit(): Promise<'exit' | 'followup'> {
+    if (!process.stdin.isTTY) return 'exit';
 
     this.log('');
-    this.log(format.dim('(press q to exit)'));
+    this.log(format.dim('(press q to exit · f to ask follow-up)'));
 
-    return new Promise<void>((resolve) => {
+    return new Promise<'exit' | 'followup'>((resolve) => {
       const onData = (chunk: Buffer) => {
         const str = chunk.toString();
 
-        // Exit only when q, Q, or Ctrl+C is pressed.
-        // This allows arrow keys, mouse wheel, and PageUp/PageDown to scroll the viewport history cleanly.
         if (str.toLowerCase() === 'q' || str === '\u0003') {
           cleanup();
-          resolve();
+          resolve('exit');
+        } else if (str.toLowerCase() === 'f' || str === '\u0006') {
+          cleanup();
+          resolve('followup');
         }
       };
 

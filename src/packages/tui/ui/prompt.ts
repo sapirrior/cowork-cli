@@ -1,5 +1,7 @@
 import InputBox from '../engine/components/InputBox.js';
 import ToolConfirmationCard from '../engine/components/ToolConfirmationCard.js';
+import FollowUpBox from '../engine/components/FollowUpBox.js';
+import { formatPromptQuery } from './outputFormatter.js';
 import { rgb, dim, bold } from './format.js';
 import { THEME } from '../theme.js';
 
@@ -132,6 +134,135 @@ export async function ask(uiInstance: UIInstance, question: string): Promise<str
     if (process.stdin.isTTY) {
       process.stdin.setRawMode(true);
     }
+    process.stdin.ref();
+    process.stdin.resume();
+    process.stdin.on('data', onData);
+  });
+
+  const exitCleanup = () => {
+    if (cleanup) cleanup();
+  };
+  process.once('exit', exitCleanup);
+
+  return promise.finally(() => {
+    activePromptLock = false;
+    process.off('exit', exitCleanup);
+  });
+}
+
+export async function askFollowUp(uiInstance: UIInstance): Promise<string> {
+  if (activePromptLock) {
+    throw new Error('Another interactive prompt is already active.');
+  }
+  activePromptLock = true;
+  uiInstance._abortActiveSpinner();
+  if (!process.stdin.isTTY) {
+    activePromptLock = false;
+    throw new Error('stdin is not a TTY');
+  }
+
+  const inputComp = new FollowUpBox({ currentVal: '' });
+  uiInstance.engine.mount(inputComp, { keepCursorVisible: true });
+
+  let buffer = '';
+  let cursorIndex = 0;
+  let onData: (chunk: Buffer) => void;
+  let cleanup: () => void;
+
+  const promise = new Promise<string>((resolve, reject) => {
+    onData = (chunk: Buffer) => {
+      const str = chunk.toString();
+
+      if (str === '\u0003') {
+        cleanup();
+        uiInstance.engine.unmountAll();
+        uiInstance.engine.commit('raw', [
+          `${THEME.formatMain('❯')} ${rgb(THEME.error, 'cancelled')}`
+        ]);
+        reject({ cancelled: true });
+        return;
+      }
+
+      // Arrow keys navigation
+      if (str === '\u001b[D') { // Left Arrow
+        cursorIndex = Math.max(0, cursorIndex - 1);
+        inputComp.setState({ cursorIndex });
+        return;
+      }
+      if (str === '\u001b[C') { // Right Arrow
+        cursorIndex = Math.min(buffer.length, cursorIndex + 1);
+        inputComp.setState({ cursorIndex });
+        return;
+      }
+
+      // Home & End keys
+      if (str === '\u001b[H' || str === '\u001bOH' || str === '\u001b[1~') { // Home
+        cursorIndex = 0;
+        inputComp.setState({ cursorIndex });
+        return;
+      }
+      if (str === '\u001b[F' || str === '\u001bOF' || str === '\u001b[4~') { // End
+        cursorIndex = buffer.length;
+        inputComp.setState({ cursorIndex });
+        return;
+      }
+
+      // Backspace
+      if (str === '\u007f' || str === '\b') {
+        if (cursorIndex > 0) {
+          buffer = buffer.slice(0, cursorIndex - 1) + buffer.slice(cursorIndex);
+          cursorIndex--;
+          inputComp.setState({ currentVal: buffer, cursorIndex });
+        }
+        return;
+      }
+
+      // Delete key
+      if (str === '\u001b[3~') {
+        if (cursorIndex < buffer.length) {
+          buffer = buffer.slice(0, cursorIndex) + buffer.slice(cursorIndex + 1);
+          inputComp.setState({ currentVal: buffer });
+        }
+        return;
+      }
+
+      if (str === '\r' || str === '\n') {
+        cleanup();
+        uiInstance.engine.unmountAll();
+        
+        // Print it as a formatted prompt query
+        const formatted = formatPromptQuery(buffer);
+        uiInstance.engine.commit('raw', formatted.split('\n'));
+        
+        resolve(buffer.trim());
+        return;
+      }
+
+      if (str.startsWith('\u001b')) {
+        return;
+      }
+
+      const cleanStr = str.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+      if (cleanStr.length > 0) {
+        buffer = buffer.slice(0, cursorIndex) + cleanStr + buffer.slice(cursorIndex);
+        cursorIndex += cleanStr.length;
+        inputComp.setState({ currentVal: buffer, cursorIndex });
+      }
+    };
+
+    cleanup = () => {
+      if (process.stdin.isTTY) {
+        process.stdin.setRawMode(false);
+      }
+      process.stdin.off('data', onData);
+    };
+
+    if (process.stdin.isTTY) {
+      process.stdin.setRawMode(true);
+    }
+    try {
+      process.stdin.read();
+    } catch {}
     process.stdin.ref();
     process.stdin.resume();
     process.stdin.on('data', onData);

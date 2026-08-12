@@ -109,104 +109,134 @@ export default class BaseModel {
     ui.prompt(formatPromptQuery(query));
     ui.prompt('');
     
-    let turn = 0;
-    while (turn < this.maxTurns) {
-      turn++;
-      
-      try {
-        ui.think();
-        const response = await this._getCompletion();
+    while (true) {
+      let turn = 0;
+      let loopFinishedCleanly = false;
 
-        // Guard against empty/null choices (content filter, provider quirks).
-        const choice = response.choices?.[0];
-        if (!choice?.message) {
-          ui.stop(); // Stop thinking spinner
-          logger.error("[API Error] Received empty or malformed response (no choices).");
-          return;
-        }
-        const message = choice.message;
-        const finishReason = choice.finish_reason;
+      while (turn < this.maxTurns) {
+        turn++;
+        
+        try {
+          ui.think();
+          const response = await this._getCompletion();
 
-        // Surface meaningful finish reasons to the user instead of silent behaviour.
-        if (finishReason === 'content_filter') {
-          ui.stop(); // Stop thinking spinner
-          logger.secondary("[System]: Response was blocked by the provider's content filter.");
-          this._printStats();
-          return;
-        }
-        if (finishReason === 'length') {
-          logger.secondary("[System]: Response was truncated due to token limits.");
-        }
+          // Guard against empty/null choices (content filter, provider quirks).
+          const choice = response.choices?.[0];
+          if (!choice?.message) {
+            ui.stop(); // Stop thinking spinner
+            logger.error("[API Error] Received empty or malformed response (no choices).");
+            return;
+          }
+          const message = choice.message;
+          const finishReason = choice.finish_reason;
 
-        // Let subclasses handle/format the response (e.g. Gemini thought signatures)
-        await this.handleResponse(message);
-
-        // Extract and display thinking segments and final response
-        if (message.content && message.content.trim().length > 0) {
-          const { thinking, response } = extractThinking(message.content);
-          
-          if (thinking.trim().length > 0) {
-            ui.stop(); // Stop thinking spinner before printing thinking
-            const formattedThinking = formatThinkingOnly(thinking);
-            ui.log(formattedThinking);
+          // Surface meaningful finish reasons to the user instead of silent behaviour.
+          if (finishReason === 'content_filter') {
+            ui.stop(); // Stop thinking spinner
+            logger.secondary("[System]: Response was blocked by the provider's content filter.");
+            this._printStats();
+            return;
+          }
+          if (finishReason === 'length') {
+            logger.secondary("[System]: Response was truncated due to token limits.");
           }
 
-          const hasResponse = response.trim().length > 0;
-          const hasTools = Array.isArray(message.tool_calls) && message.tool_calls.length > 0;
+          // Let subclasses handle/format the response (e.g. Gemini thought signatures)
+          await this.handleResponse(message);
 
-          if (!hasTools) {
-            ui.stop(); // Ensure thinking spinner is stopped
-            if (hasResponse) {
-              if (thinking.trim().length > 0) {
-                // Keep a one line space gap between thinking and response
-                ui.log('');
-              }
-              const formattedResponse = outputFormatted(response);
-              ui.log(formattedResponse);
-            } else if (thinking.trim().length === 0) {
-              logger.error('[System]: Model returned an empty final response.');
+          // Extract and display thinking segments and final response
+          if (message.content && message.content.trim().length > 0) {
+            const { thinking, response: responseText } = extractThinking(message.content);
+            
+            if (thinking.trim().length > 0) {
+              ui.stop(); // Stop thinking spinner before printing thinking
+              const formattedThinking = formatThinkingOnly(thinking);
+              ui.log(formattedThinking);
             }
-            this._printStats();
-            await ui.waitForExit();
-            return;
-          }
-        } else {
-          const hasTools = Array.isArray(message.tool_calls) && message.tool_calls.length > 0;
-          if (!hasTools) {
-            ui.stop();
-            logger.error('[System]: Model returned an empty final response.');
-            this._printStats();
-            await ui.waitForExit();
-            return;
-          }
-        }
 
-        // Execute and record tool calls (spinner transition handled inside)
-        await this._processToolCalls(message.tool_calls);
+            const hasResponse = responseText.trim().length > 0;
+            const hasTools = Array.isArray(message.tool_calls) && message.tool_calls.length > 0;
 
-      } catch (err: any) {
-        // Use ui.fail() (red dot) instead of ui.stop() (green dot) so the
-        // terminal reflects that the turn ended in error. fail() is a no-op when IDLE.
-        ui.fail();
-        const errStr = (err.message || '').toLowerCase();
-        // Deep error logging for API failures
-        if (err.status) {
-          logger.error(`[API Error] Status: ${err.status}`);
-          if (err.response?.data) {
-             logger.error(`[API Error] Details: ${JSON.stringify(err.response.data)}`);
+            if (!hasTools) {
+              ui.stop(); // Ensure thinking spinner is stopped
+              if (hasResponse) {
+                if (thinking.trim().length > 0) {
+                  // Keep a one line space gap between thinking and response
+                  ui.log('');
+                }
+                const formattedResponse = outputFormatted(responseText);
+                ui.log(formattedResponse);
+              } else if (thinking.trim().length === 0) {
+                logger.error('[System]: Model returned an empty final response.');
+              }
+              loopFinishedCleanly = true;
+              break;
+            }
+          } else {
+            const hasTools = Array.isArray(message.tool_calls) && message.tool_calls.length > 0;
+            if (!hasTools) {
+              ui.stop();
+              logger.error('[System]: Model returned an empty final response.');
+              loopFinishedCleanly = true;
+              break;
+            }
           }
-        } else if (err.name === 'AbortError' || errStr.includes('timeout')) {
-          logger.error(`[Timeout Error]: The AI took too long to respond (60s).`);
-        } else {
-          logger.error(`[Error]: ${err.message || err}`);
+
+          // Execute and record tool calls (spinner transition handled inside)
+          await this._processToolCalls(message.tool_calls);
+
+        } catch (err: any) {
+          // Use ui.fail() (red dot) instead of ui.stop() (green dot) so the
+          // terminal reflects that the turn ended in error. fail() is a no-op when IDLE.
+          ui.fail();
+          const errStr = (err.message || '').toLowerCase();
+          // Deep error logging for API failures
+          if (err.status) {
+            logger.error(`[API Error] Status: ${err.status}`);
+            if (err.response?.data) {
+               logger.error(`[API Error] Details: ${JSON.stringify(err.response.data)}`);
+            }
+          } else if (err.name === 'AbortError' || errStr.includes('timeout')) {
+            logger.error(`[Timeout Error]: The AI took too long to respond (60s).`);
+          } else {
+            logger.error(`[Error]: ${err.message || err}`);
+          }
+          throw err;
         }
-        throw err;
       }
-    }
 
-    this._printStats();
-    logger.secondary("[System]: Reached maximum conversation turns. Ending session.");
-    await ui.waitForExit();
+      if (!loopFinishedCleanly && turn >= this.maxTurns) {
+        logger.secondary("[System]: Reached maximum conversation turns. Ending session.");
+      }
+
+      this._printStats();
+
+      // Wait for exit or follow-up request
+      const action = await ui.waitForExit();
+      if (action === 'exit') {
+        return;
+      }
+
+      // If user selected 'followup', ask for query input
+      let followUp = '';
+      try {
+        followUp = await ui.askFollowUp();
+      } catch (e: any) {
+        // If user hits Ctrl+C or cancels the input prompt, exit cleanly
+        return;
+      }
+
+      if (!followUp || followUp.toLowerCase() === 'q') {
+        return;
+      }
+
+      // Record the follow-up prompt
+      this.addMessage('user', followUp);
+      // Log spacing and a divider before next response
+      ui.log('');
+      // Reset start time for accurate statistics on the follow-up execution
+      this._runStartTime = performance.now();
+    }
   }
 
   async _getCompletion(): Promise<any> {

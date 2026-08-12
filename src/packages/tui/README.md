@@ -47,6 +47,8 @@ The `tui` package implements a state-driven, flicker-free terminal rendering eng
 | `SelectionList.ts` | Arrow-key navigable selection list |
 | `ProviderSelector.ts` | Provider login selector |
 | `ToolConfirmationCard.ts` | Lean, interactive tool confirmation card with content showcase, yellow vertical left border, and keybindings (`y`/`n`/`Enter`/`Esc`/`Tab`/`Ctrl+Y`/`Ctrl+N`/`Ctrl+E`/`Arrow keys`) |
+| `StreamingText.ts` | Dynamic text renderer supporting live streaming and real-time state-based thinking extraction |
+| `FollowUpBox.ts` | Minimal, inline prompt input widget (prefix `❯ `) for follow-up queries |
 
 ## 🚀 Usage
 
@@ -70,6 +72,9 @@ if (thinking) {
   const formattedThinking = formatThinkingOnly(thinking);
   ui.log(formattedThinking);
 }
+
+// Ask for user follow-up inline using FollowUpBox
+const query = await ui.askFollowUp();
 ```
 
 ## 📜 Terminal Invariants & Safety
