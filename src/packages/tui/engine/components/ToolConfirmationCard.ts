@@ -29,43 +29,123 @@ const redColor:    [number, number, number] = [224, 112, 112];
 const dimColor:    [number, number, number] = [160, 165, 175];
 
 /**
- * Preview line formatter:
- * - Additions (+): Green marker + syntax highlighted code
- * - Deletions / Minus lines (-): Red marker + syntax highlighted code
- * - Shell commands ($): Bold Gold $ + bash highlighted command
- * - Base Code: Syntax highlighted based on file language
+ * Preview line formatter and wrapper:
+ * - Slices code lines by available TUI width (maxWidth).
+ * - Prepend standard vertical bar border '  │ ' to every wrapped chunk.
+ * - Slices raw content *before* highlighting to prevent slicing ANSI sequences.
  */
-function formatPreviewLine(line: string, language: string): string {
-  if (!line) return '';
+function renderPreviewLine(
+  line: string,
+  language: string,
+  maxWidth: number,
+  yellowBar: string
+): string[] {
+  if (!line) {
+    return [`  ${yellowBar} `];
+  }
 
+  const resultLines: string[] = [];
   const trimmed = line.trim();
 
   // 1. Edit diff additions (+ ...) -> Green marker + highlighted code
   if (line.startsWith('+')) {
-    const spaceCode = line.slice(1);
-    const spaceMatch = spaceCode.match(/^(\s*)(.*)$/);
-    const space = spaceMatch ? spaceMatch[1] : '';
-    const code = spaceMatch ? spaceMatch[2] : '';
-    return rgb(greenColor, '+') + space + highlightLine(code, language);
+    const rawCode = line.slice(1);
+    const spaceMatch = rawCode.match(/^(\s*)(.*)$/);
+    const firstSpace = spaceMatch ? spaceMatch[1] : '';
+    const codeContent = spaceMatch ? spaceMatch[2] : '';
+    
+    // Code available width is maxWidth - 2 (since '+ ' takes 2 characters)
+    const codeLimit = Math.max(5, maxWidth - 2);
+    const chunks: string[] = [];
+    if (codeContent.length === 0) {
+      chunks.push('');
+    } else {
+      for (let i = 0; i < codeContent.length; i += codeLimit) {
+        chunks.push(codeContent.slice(i, i + codeLimit));
+      }
+    }
+
+    for (let idx = 0; idx < chunks.length; idx++) {
+      if (idx === 0) {
+        const formatted = rgb(greenColor, '+') + firstSpace + highlightLine(chunks[idx], language);
+        resultLines.push(`  ${yellowBar} ${formatted}`);
+      } else {
+        const formatted = '  ' + highlightLine(chunks[idx], language);
+        resultLines.push(`  ${yellowBar} ${formatted}`);
+      }
+    }
+    return resultLines;
   }
 
   // 2. Edit diff deletions / minus lines (- ...) -> Red marker + highlighted code
   if (line.startsWith('-')) {
-    const spaceCode = line.slice(1);
-    const spaceMatch = spaceCode.match(/^(\s*)(.*)$/);
-    const space = spaceMatch ? spaceMatch[1] : '';
-    const code = spaceMatch ? spaceMatch[2] : '';
-    return rgb(redColor, '-') + space + highlightLine(code, language);
+    const rawCode = line.slice(1);
+    const spaceMatch = rawCode.match(/^(\s*)(.*)$/);
+    const firstSpace = spaceMatch ? spaceMatch[1] : '';
+    const codeContent = spaceMatch ? spaceMatch[2] : '';
+    
+    const codeLimit = Math.max(5, maxWidth - 2);
+    const chunks: string[] = [];
+    if (codeContent.length === 0) {
+      chunks.push('');
+    } else {
+      for (let i = 0; i < codeContent.length; i += codeLimit) {
+        chunks.push(codeContent.slice(i, i + codeLimit));
+      }
+    }
+
+    for (let idx = 0; idx < chunks.length; idx++) {
+      if (idx === 0) {
+        const formatted = rgb(redColor, '-') + firstSpace + highlightLine(chunks[idx], language);
+        resultLines.push(`  ${yellowBar} ${formatted}`);
+      } else {
+        const formatted = '  ' + highlightLine(chunks[idx], language);
+        resultLines.push(`  ${yellowBar} ${formatted}`);
+      }
+    }
+    return resultLines;
   }
 
   // 3. Shell commands ($ ...) -> Gold $ + bash highlighted code
   if (trimmed.startsWith('$')) {
-    const code = trimmed.slice(1).trim();
-    return bold(rgb(amberColor, '$ ')) + highlightLine(code, 'bash');
+    const codeContent = trimmed.slice(1).trim();
+    const codeLimit = Math.max(5, maxWidth - 2);
+    const chunks: string[] = [];
+    if (codeContent.length === 0) {
+      chunks.push('');
+    } else {
+      for (let i = 0; i < codeContent.length; i += codeLimit) {
+        chunks.push(codeContent.slice(i, i + codeLimit));
+      }
+    }
+
+    for (let idx = 0; idx < chunks.length; idx++) {
+      if (idx === 0) {
+        const formatted = bold(rgb(amberColor, '$ ')) + highlightLine(chunks[idx], 'bash');
+        resultLines.push(`  ${yellowBar} ${formatted}`);
+      } else {
+        const formatted = '  ' + highlightLine(chunks[idx], 'bash');
+        resultLines.push(`  ${yellowBar} ${formatted}`);
+      }
+    }
+    return resultLines;
   }
 
   // Base code lines: syntax highlighted with the detected language
-  return highlightLine(line, language);
+  const chunks: string[] = [];
+  if (line.length === 0) {
+    chunks.push('');
+  } else {
+    for (let i = 0; i < line.length; i += maxWidth) {
+      chunks.push(line.slice(i, i + maxWidth));
+    }
+  }
+
+  for (const chunk of chunks) {
+    resultLines.push(`  ${yellowBar} ${highlightLine(chunk, language)}`);
+  }
+
+  return resultLines;
 }
 
 /**
@@ -109,11 +189,16 @@ export default class ToolConfirmationCard extends Component<ToolConfirmationProp
     const yellowBar = rgb(amberColor, '│');
     const isCommand = toolName.toLowerCase().includes('command') || toolName.toLowerCase().includes('exec');
     const language = isCommand ? 'bash' : detectLanguage(target, details);
+    const width = process.stdout.columns || 80;
+    const maxWidth = Math.max(10, width - 6);
 
     if (details && details.length > 0) {
       if (expanded) {
         for (const line of details) {
-          lines.push(`  ${yellowBar} ${formatPreviewLine(line, language)}`);
+          const renderedChunks = renderPreviewLine(line, language, maxWidth, yellowBar);
+          for (const renderedChunk of renderedChunks) {
+            lines.push(renderedChunk);
+          }
         }
       } else {
         lines.push(`  ${yellowBar} ${dim(`(preview hidden · Tab or e to expand ${details.length} lines)`)}`);

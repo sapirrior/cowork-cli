@@ -1,7 +1,14 @@
 # 🌿 Sonnet CLI (`@sapirror/sonnet-cli`)
 
-> **Stop waiting. Start knowing.**
-> An autonomous AI engineering co-worker that lives in your terminal, investigates codebases, writes and edits code, runs terminal commands, and verifies solutions.
+<p align="center">
+  <pre>
+ ▛███▜   <b>Sonnet CLI</b>
+▛█████▜  <i>Stop waiting. Start knowing.</i>
+ ▘▘ ▝▝
+  </pre>
+</p>
+
+An autonomous AI engineering co-worker that lives in your terminal, investigates codebases, writes and edits code, runs terminal commands, and verifies solutions.
 
 ---
 
