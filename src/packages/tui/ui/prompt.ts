@@ -12,6 +12,10 @@ interface UIInstance {
 
 let activePromptLock = false;
 
+export function isPromptActive(): boolean {
+  return activePromptLock;
+}
+
 /**
  * Standard tool label resolver matching Sonnet tool conventions.
  */

@@ -1,6 +1,6 @@
 import { toolDefinitions, dispatchTool, isInteractiveTool, isKnownTool } from '../../agent/index.js';
 import { logger, formatMain, formatDim } from '../../utils/index.js';
-import { ui, outputFormatted, formatPromptQuery, extractThinking, formatThinkingOnly, StreamingText } from '../../tui/index.js';
+import { ui, outputFormatted, formatPromptQuery, extractThinking, formatThinkingOnly, StreamingText, isPromptActive } from '../../tui/index.js';
 import { getLogoLines } from '../../../assets/logo.js';
 import { OpenAI } from 'openai';
 
@@ -133,6 +133,9 @@ export default class BaseModel {
     // Raw key listener on stdin to catch Ctrl+C (\u0003) while raw mode is active (TUI spinning/streaming)
     const onRawInput = (data: Buffer) => {
       if (data.toString() === '\u0003') {
+        if (isPromptActive()) {
+          return;
+        }
         localSigint();
       }
     };
