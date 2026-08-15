@@ -39,7 +39,7 @@
   "main": "./dist/src/core/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "node_modules/.bin/tsc && cp -r src/packages/config/configs dist/src/packages/config/ && cp -r src/assets dist/src/",
+    "build": "node node_modules/typescript/bin/tsc && cp -r src/packages/config/configs dist/src/packages/config/ && cp -r src/assets dist/src/",
     "start": "node dist/bin/cli.js",
     "dev": "tsx bin/cli.ts"
   },
@@ -53,6 +53,6 @@
   },
   "devDependencies": {
     "@types/node": "^25.9.3",
-    "typescript": "^7.0.2"
+    "typescript": "^5.7.3"
   }
 }

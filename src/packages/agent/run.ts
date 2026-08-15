@@ -36,8 +36,8 @@ export default async function runQuery(
       const promptPath = path.join(__dirname, '../config/configs/sys.txt');
       if (fs.existsSync(promptPath)) {
         systemPrompt = fs.readFileSync(promptPath, 'utf8')
-          .replace('${folder}', process.cwd())
-          .replace(/\${year}/g, String(new Date().getFullYear()));
+          .replace(/\$\{folder\}/g, process.cwd())
+          .replace(/\$\{year\}/g, String(new Date().getFullYear()));
       }
     } catch (e) {
       // Fallback if prompt is missing - proceed without system prompt
