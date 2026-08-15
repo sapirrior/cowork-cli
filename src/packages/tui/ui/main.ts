@@ -74,7 +74,7 @@ class UIEngine {
     if (!process.stdin.isTTY) return 'exit';
 
     this.log('');
-    this.log(format.dim('(q exit · f follow-up · k/j/g/G scroll · --help for all keys)'));
+    this.log(format.dim('(press q to exit · f to ask follow-up)'));
 
     return new Promise<'exit' | 'followup'>((resolve) => {
       const onData = (chunk: Buffer) => {

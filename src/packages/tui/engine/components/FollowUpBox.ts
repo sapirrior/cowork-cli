@@ -1,7 +1,7 @@
 import Component from '../Component.js';
 import stringWidth from 'string-width';
 import { THEME } from '../../theme.js';
-import { wrapByVisualWidth, visualCursorOffset } from './InputBox.js';
+import { wrapByVisualWidth } from './InputBox.js';
 
 interface FollowUpBoxProps {
   currentVal?: string;
@@ -43,14 +43,15 @@ export default class FollowUpBox extends Component<FollowUpBoxProps, FollowUpBox
     const maxContentCols = Math.max(10, width - 1 - PREFIX_COLS);
 
     const { currentVal, cursorIndex } = this.state;
-    const totalOffset = visualCursorOffset(currentVal, cursorIndex);
+    const sub = currentVal.substring(0, cursorIndex);
+    const totalOffset = stringWidth(sub);
 
     const cursorLineOffset = Math.floor(totalOffset / maxContentCols);
     const cursorColOffset  = totalOffset % maxContentCols;
 
     return {
       line:   1 + cursorLineOffset,      // line 0 = top border, line 1 = first content line
-      column: PREFIX_COLS + cursorColOffset + 1, // 1-indexed, no indent
+      column: PREFIX_COLS + 1 + cursorColOffset, // 1-indexed, no indent
     };
   }
 
