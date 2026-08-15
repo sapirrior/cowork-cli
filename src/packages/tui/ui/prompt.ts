@@ -16,17 +16,147 @@ export function isPromptActive(): boolean {
   return activePromptLock;
 }
 
+// ─── Word-navigation helpers ──────────────────────────────────────────────────
+
+function wordRight(buf: string, idx: number): number {
+  // Skip current non-space run, then skip spaces
+  while (idx < buf.length && buf[idx] !== ' ') idx++;
+  while (idx < buf.length && buf[idx] === ' ') idx++;
+  return idx;
+}
+
+function wordLeft(buf: string, idx: number): number {
+  // Skip spaces to the left, then skip non-space run
+  while (idx > 0 && buf[idx - 1] === ' ') idx--;
+  while (idx > 0 && buf[idx - 1] !== ' ') idx--;
+  return idx;
+}
+
+// ─── Shared key handler ───────────────────────────────────────────────────────
+
+interface InputState {
+  buffer: string;
+  cursorIndex: number;
+}
+
+type UpdateCallback = (state: InputState) => void;
+type ResolveCallback = (value: string) => void;
+type RejectCallback  = (reason: any)  => void;
+
 /**
- * Standard tool label resolver matching Sonnet tool conventions.
+ * Handles a raw terminal keypress for a text input field.
+ * Returns true if the event was consumed and should not propagate further.
+ * Returns 'submit' when the user presses Enter, 'cancel' on Ctrl+C.
  */
+function handleInputKey(
+  str: string,
+  state: InputState,
+  onUpdate: UpdateCallback
+): 'submit' | 'cancel' | 'consumed' | 'unhandled' {
+  let { buffer, cursorIndex } = state;
+
+  // ── Cancel ────────────────────────────────────────────────────────
+  if (str === '\u0003') return 'cancel';
+
+  // ── Submit ────────────────────────────────────────────────────────
+  if (str === '\r' || str === '\n') return 'submit';
+
+  // ── Ignore unrelated escape sequences early ───────────────────────
+  // (we handle known ones below; unknown ones are silently dropped)
+
+  // ── Arrow keys: character navigation ─────────────────────────────
+  if (str === '\u001b[D') {               // Left Arrow
+    cursorIndex = Math.max(0, cursorIndex - 1);
+    onUpdate({ buffer, cursorIndex });
+    return 'consumed';
+  }
+  if (str === '\u001b[C') {               // Right Arrow
+    cursorIndex = Math.min(buffer.length, cursorIndex + 1);
+    onUpdate({ buffer, cursorIndex });
+    return 'consumed';
+  }
+
+  // ── Word navigation (Ctrl+Left / Ctrl+Right) ──────────────────────
+  // Termux / most terminals send \x1b[1;5D and \x1b[1;5C,
+  // but also common: \x1bb (Alt+b) and \x1bf (Alt+f) in readline style
+  if (str === '\u001b[1;5D' || str === '\u001bb') {  // Ctrl+Left / Alt+b
+    cursorIndex = wordLeft(buffer, cursorIndex);
+    onUpdate({ buffer, cursorIndex });
+    return 'consumed';
+  }
+  if (str === '\u001b[1;5C' || str === '\u001bf') {  // Ctrl+Right / Alt+f
+    cursorIndex = wordRight(buffer, cursorIndex);
+    onUpdate({ buffer, cursorIndex });
+    return 'consumed';
+  }
+
+  // ── Home / End ────────────────────────────────────────────────────
+  if (str === '\u001b[H' || str === '\u001bOH' || str === '\u001b[1~') {
+    cursorIndex = 0;
+    onUpdate({ buffer, cursorIndex });
+    return 'consumed';
+  }
+  if (str === '\u001b[F' || str === '\u001bOF' || str === '\u001b[4~') {
+    cursorIndex = buffer.length;
+    onUpdate({ buffer, cursorIndex });
+    return 'consumed';
+  }
+
+  // ── Backspace ─────────────────────────────────────────────────────
+  if (str === '\u007f' || str === '\b') {
+    if (cursorIndex > 0) {
+      buffer = buffer.slice(0, cursorIndex - 1) + buffer.slice(cursorIndex);
+      cursorIndex--;
+      onUpdate({ buffer, cursorIndex });
+    }
+    return 'consumed';
+  }
+
+  // ── Ctrl+Backspace / Ctrl+W — delete word to the left ─────────────
+  if (str === '\u0017') {
+    const newIdx = wordLeft(buffer, cursorIndex);
+    buffer = buffer.slice(0, newIdx) + buffer.slice(cursorIndex);
+    cursorIndex = newIdx;
+    onUpdate({ buffer, cursorIndex });
+    return 'consumed';
+  }
+
+  // ── Delete key ────────────────────────────────────────────────────
+  if (str === '\u001b[3~') {
+    if (cursorIndex < buffer.length) {
+      buffer = buffer.slice(0, cursorIndex) + buffer.slice(cursorIndex + 1);
+      onUpdate({ buffer, cursorIndex });
+    }
+    return 'consumed';
+  }
+
+  // ── Drop remaining unhandled escape sequences ─────────────────────
+  if (str.startsWith('\u001b')) return 'consumed';
+
+  // ── Printable characters ──────────────────────────────────────────
+  const cleanStr = str.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+  if (cleanStr.length > 0) {
+    buffer = buffer.slice(0, cursorIndex) + cleanStr + buffer.slice(cursorIndex);
+    cursorIndex += cleanStr.length;
+    onUpdate({ buffer, cursorIndex });
+    return 'consumed';
+  }
+
+  return 'unhandled';
+}
+
+// ─── Standard label resolver ──────────────────────────────────────────────────
+
 function getToolLabel(toolName: string, action?: string): string {
   const clean = toolName.toLowerCase();
-  if (clean.includes('write'))   return 'writing file';
-  if (clean.includes('edit'))    return 'editing file';
-  if (clean.includes('delete'))  return 'deleting file';
+  if (clean.includes('write'))                            return 'writing file';
+  if (clean.includes('edit'))                             return 'editing file';
+  if (clean.includes('delete'))                           return 'deleting file';
   if (clean.includes('command') || clean.includes('exec')) return 'running command';
   return action || toolName;
 }
+
+// ─── ask() ───────────────────────────────────────────────────────────────────
 
 export async function ask(uiInstance: UIInstance, question: string): Promise<string> {
   if (activePromptLock) {
@@ -42,8 +172,7 @@ export async function ask(uiInstance: UIInstance, question: string): Promise<str
   const inputComp = new InputBox({ label: question, currentVal: '' });
   uiInstance.engine.mount(inputComp, { keepCursorVisible: true });
 
-  let buffer = '';
-  let cursorIndex = 0;
+  const inputState: InputState = { buffer: '', cursorIndex: 0 };
   let onData: (chunk: Buffer) => void;
   let cleanup: () => void;
 
@@ -51,7 +180,13 @@ export async function ask(uiInstance: UIInstance, question: string): Promise<str
     onData = (chunk: Buffer) => {
       const str = chunk.toString();
 
-      if (str === '\u0003') {
+      const result = handleInputKey(str, inputState, (next) => {
+        inputState.buffer      = next.buffer;
+        inputState.cursorIndex = next.cursorIndex;
+        inputComp.setState({ currentVal: next.buffer, cursorIndex: next.cursorIndex });
+      });
+
+      if (result === 'cancel') {
         cleanup();
         uiInstance.engine.unmountAll();
         uiInstance.engine.commit('raw', [
@@ -61,91 +196,29 @@ export async function ask(uiInstance: UIInstance, question: string): Promise<str
         reject({ cancelled: true });
         return;
       }
-
-      // Arrow keys navigation
-      if (str === '\u001b[D') { // Left Arrow
-        cursorIndex = Math.max(0, cursorIndex - 1);
-        inputComp.setState({ cursorIndex });
-        return;
-      }
-      if (str === '\u001b[C') { // Right Arrow
-        cursorIndex = Math.min(buffer.length, cursorIndex + 1);
-        inputComp.setState({ cursorIndex });
-        return;
-      }
-
-      // Home & End keys
-      if (str === '\u001b[H' || str === '\u001bOH' || str === '\u001b[1~') { // Home
-        cursorIndex = 0;
-        inputComp.setState({ cursorIndex });
-        return;
-      }
-      if (str === '\u001b[F' || str === '\u001bOF' || str === '\u001b[4~') { // End
-        cursorIndex = buffer.length;
-        inputComp.setState({ cursorIndex });
-        return;
-      }
-
-      // Backspace
-      if (str === '\u007f' || str === '\b') {
-        if (cursorIndex > 0) {
-          buffer = buffer.slice(0, cursorIndex - 1) + buffer.slice(cursorIndex);
-          cursorIndex--;
-          inputComp.setState({ currentVal: buffer, cursorIndex });
-        }
-        return;
-      }
-
-      // Delete key
-      if (str === '\u001b[3~') {
-        if (cursorIndex < buffer.length) {
-          buffer = buffer.slice(0, cursorIndex) + buffer.slice(cursorIndex + 1);
-          inputComp.setState({ currentVal: buffer });
-        }
-        return;
-      }
-
-      if (str === '\r' || str === '\n') {
+      if (result === 'submit') {
         cleanup();
         uiInstance.engine.unmountAll();
         uiInstance.engine.commit('raw', [
           `  ${rgb(THEME.tool, 'Ask:')} ${rgb(THEME.data, question)}`,
-          `  ${buffer}`
+          `  ${inputState.buffer}`
         ]);
-        resolve(buffer.trim());
-        return;
-      }
-
-      if (str.startsWith('\u001b')) {
-        return;
-      }
-
-      const cleanStr = str.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
-      if (cleanStr.length > 0) {
-        buffer = buffer.slice(0, cursorIndex) + cleanStr + buffer.slice(cursorIndex);
-        cursorIndex += cleanStr.length;
-        inputComp.setState({ currentVal: buffer, cursorIndex });
+        resolve(inputState.buffer.trim());
       }
     };
 
     cleanup = () => {
-      if (process.stdin.isTTY) {
-        process.stdin.setRawMode(false);
-      }
+      if (process.stdin.isTTY) process.stdin.setRawMode(false);
       process.stdin.off('data', onData);
     };
 
-    if (process.stdin.isTTY) {
-      process.stdin.setRawMode(true);
-    }
+    if (process.stdin.isTTY) process.stdin.setRawMode(true);
     process.stdin.ref();
     process.stdin.resume();
     process.stdin.on('data', onData);
   });
 
-  const exitCleanup = () => {
-    if (cleanup) cleanup();
-  };
+  const exitCleanup = () => { if (cleanup) cleanup(); };
   process.once('exit', exitCleanup);
 
   return promise.finally(() => {
@@ -153,6 +226,8 @@ export async function ask(uiInstance: UIInstance, question: string): Promise<str
     process.off('exit', exitCleanup);
   });
 }
+
+// ─── askFollowUp() ────────────────────────────────────────────────────────────
 
 export async function askFollowUp(uiInstance: UIInstance): Promise<string> {
   if (activePromptLock) {
@@ -168,8 +243,7 @@ export async function askFollowUp(uiInstance: UIInstance): Promise<string> {
   const inputComp = new FollowUpBox({ currentVal: '' });
   uiInstance.engine.mount(inputComp, { keepCursorVisible: true });
 
-  let buffer = '';
-  let cursorIndex = 0;
+  const inputState: InputState = { buffer: '', cursorIndex: 0 };
   let onData: (chunk: Buffer) => void;
   let cleanup: () => void;
 
@@ -177,7 +251,13 @@ export async function askFollowUp(uiInstance: UIInstance): Promise<string> {
     onData = (chunk: Buffer) => {
       const str = chunk.toString();
 
-      if (str === '\u0003') {
+      const result = handleInputKey(str, inputState, (next) => {
+        inputState.buffer      = next.buffer;
+        inputState.cursorIndex = next.cursorIndex;
+        inputComp.setState({ currentVal: next.buffer, cursorIndex: next.cursorIndex });
+      });
+
+      if (result === 'cancel') {
         cleanup();
         uiInstance.engine.unmountAll();
         uiInstance.engine.commit('raw', [
@@ -186,95 +266,28 @@ export async function askFollowUp(uiInstance: UIInstance): Promise<string> {
         reject({ cancelled: true });
         return;
       }
-
-      // Arrow keys navigation
-      if (str === '\u001b[D') { // Left Arrow
-        cursorIndex = Math.max(0, cursorIndex - 1);
-        inputComp.setState({ cursorIndex });
-        return;
-      }
-      if (str === '\u001b[C') { // Right Arrow
-        cursorIndex = Math.min(buffer.length, cursorIndex + 1);
-        inputComp.setState({ cursorIndex });
-        return;
-      }
-
-      // Home & End keys
-      if (str === '\u001b[H' || str === '\u001bOH' || str === '\u001b[1~') { // Home
-        cursorIndex = 0;
-        inputComp.setState({ cursorIndex });
-        return;
-      }
-      if (str === '\u001b[F' || str === '\u001bOF' || str === '\u001b[4~') { // End
-        cursorIndex = buffer.length;
-        inputComp.setState({ cursorIndex });
-        return;
-      }
-
-      // Backspace
-      if (str === '\u007f' || str === '\b') {
-        if (cursorIndex > 0) {
-          buffer = buffer.slice(0, cursorIndex - 1) + buffer.slice(cursorIndex);
-          cursorIndex--;
-          inputComp.setState({ currentVal: buffer, cursorIndex });
-        }
-        return;
-      }
-
-      // Delete key
-      if (str === '\u001b[3~') {
-        if (cursorIndex < buffer.length) {
-          buffer = buffer.slice(0, cursorIndex) + buffer.slice(cursorIndex + 1);
-          inputComp.setState({ currentVal: buffer });
-        }
-        return;
-      }
-
-      if (str === '\r' || str === '\n') {
+      if (result === 'submit') {
         cleanup();
         uiInstance.engine.unmountAll();
-        
-        // Print it as a formatted prompt query
-        const formatted = formatPromptQuery(buffer);
+        const formatted = formatPromptQuery(inputState.buffer);
         uiInstance.engine.commit('raw', formatted.split('\n'));
-        
-        resolve(buffer.trim());
-        return;
-      }
-
-      if (str.startsWith('\u001b')) {
-        return;
-      }
-
-      const cleanStr = str.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
-      if (cleanStr.length > 0) {
-        buffer = buffer.slice(0, cursorIndex) + cleanStr + buffer.slice(cursorIndex);
-        cursorIndex += cleanStr.length;
-        inputComp.setState({ currentVal: buffer, cursorIndex });
+        resolve(inputState.buffer.trim());
       }
     };
 
     cleanup = () => {
-      if (process.stdin.isTTY) {
-        process.stdin.setRawMode(false);
-      }
+      if (process.stdin.isTTY) process.stdin.setRawMode(false);
       process.stdin.off('data', onData);
     };
 
-    if (process.stdin.isTTY) {
-      process.stdin.setRawMode(true);
-    }
-    try {
-      process.stdin.read();
-    } catch {}
+    if (process.stdin.isTTY) process.stdin.setRawMode(true);
+    try { process.stdin.read(); } catch {}
     process.stdin.ref();
     process.stdin.resume();
     process.stdin.on('data', onData);
   });
 
-  const exitCleanup = () => {
-    if (cleanup) cleanup();
-  };
+  const exitCleanup = () => { if (cleanup) cleanup(); };
   process.once('exit', exitCleanup);
 
   return promise.finally(() => {
@@ -282,6 +295,8 @@ export async function askFollowUp(uiInstance: UIInstance): Promise<string> {
     process.off('exit', exitCleanup);
   });
 }
+
+// ─── confirmTool() ────────────────────────────────────────────────────────────
 
 export interface ToolConfirmOptions {
   toolName?: string;
@@ -306,12 +321,12 @@ export async function confirmTool(
   }
 
   const cardComp = new ToolConfirmationCard({
-    toolName: options.toolName || 'tool',
-    action: options.action || 'confirm action',
-    target: options.target || '',
-    details: options.details || [],
+    toolName:    options.toolName  || 'tool',
+    action:      options.action    || 'confirm action',
+    target:      options.target    || '',
+    details:     options.details   || [],
     selectedIdx: 0,
-    expanded: false, // Default preview off
+    expanded:    false,
   });
 
   uiInstance.engine.mount(cardComp);
@@ -323,7 +338,9 @@ export async function confirmTool(
     uiInstance.engine.unmountAll();
     const labelStr   = rgb(THEME.tool, getToolLabel(options.toolName || 'tool', options.action));
     const targetText = options.target || options.action || '';
-    const dataStr    = targetText ? ` ${rgb(THEME.main, '(')}${rgb(THEME.data, targetText)}${rgb(THEME.main, ')')}` : '';
+    const dataStr    = targetText
+      ? ` ${rgb(THEME.main, '(')}${rgb(THEME.data, targetText)}${rgb(THEME.main, ')')}`
+      : '';
 
     if (isAllowed) {
       const bullet = rgb(THEME.success, '●');
@@ -343,48 +360,38 @@ export async function confirmTool(
       const str = chunk.toString();
 
       // Guard against accidental buffered newline (< 150ms)
-      if ((str === '\r' || str === '\n') && Date.now() - promptStartTime < 150) {
-        return;
-      }
+      if ((str === '\r' || str === '\n') && Date.now() - promptStartTime < 150) return;
 
-      // SIGINT (Ctrl+C)
       if (str === '\u0003') {
         cleanup();
         commitResult(false);
         resolve({ confirmed: false, dismissed: true });
         return;
       }
-
-      // Ctrl+Y or 'y' / 'Y' -> Confirm Allow immediately
       if (str === '\u0019' || str.toLowerCase() === 'y') {
         cleanup();
         commitResult(true);
         resolve({ confirmed: true });
         return;
       }
-
-      // Ctrl+N or 'n' / 'N' or Esc -> Deny immediately
       if (str === '\u000e' || str.toLowerCase() === 'n' || str === '\u001b') {
         cleanup();
         commitResult(false);
         resolve({ confirmed: false });
         return;
       }
-
-      // Tab or 'e' / 'E' or Ctrl+E -> Toggle Expand / Collapse preview
       if (str === '\t' || str.toLowerCase() === 'e' || str === '\u0005') {
         cardComp.setState({ expanded: !cardComp.state.expanded });
         return;
       }
-
-      // Arrow keys navigation
-      if (str === '\u001b[D' || str === '\u001b[C' || str === '\u001b[A' || str === '\u001b[B' || str === ' ') {
+      if (
+        str === '\u001b[D' || str === '\u001b[C' ||
+        str === '\u001b[A' || str === '\u001b[B' || str === ' '
+      ) {
         selectedYes = !selectedYes;
         cardComp.setState({ selectedIdx: selectedYes ? 0 : 1 });
         return;
       }
-
-      // Enter / Return -> Execute selected choice
       if (str === '\r' || str === '\n') {
         cleanup();
         commitResult(selectedYes);
@@ -394,26 +401,18 @@ export async function confirmTool(
     };
 
     cleanup = () => {
-      if (process.stdin.isTTY) {
-        process.stdin.setRawMode(false);
-      }
+      if (process.stdin.isTTY) process.stdin.setRawMode(false);
       process.stdin.off('data', onData);
     };
 
-    if (process.stdin.isTTY) {
-      process.stdin.setRawMode(true);
-    }
-    try {
-      process.stdin.read();
-    } catch {}
+    if (process.stdin.isTTY) process.stdin.setRawMode(true);
+    try { process.stdin.read(); } catch {}
     process.stdin.ref();
     process.stdin.resume();
     process.stdin.on('data', onData);
   });
 
-  const exitCleanup = () => {
-    if (cleanup) cleanup();
-  };
+  const exitCleanup = () => { if (cleanup) cleanup(); };
   process.once('exit', exitCleanup);
 
   return promise.finally(() => {
@@ -422,16 +421,16 @@ export async function confirmTool(
   });
 }
 
+// ─── confirm() ───────────────────────────────────────────────────────────────
+
 export async function confirm(
   uiInstance: UIInstance,
   question: string,
   options?: ToolConfirmOptions
 ): Promise<{ confirmed: boolean; dismissed?: boolean }> {
-  if (options) {
-    return confirmTool(uiInstance, options);
-  }
+  if (options) return confirmTool(uiInstance, options);
 
-  const lines = question.split('\n');
+  const lines     = question.split('\n');
   const firstLine = lines[0] || '';
 
   if (firstLine.includes('Overwrite file:') || firstLine.includes('Create file:')) {
@@ -439,21 +438,22 @@ export async function confirm(
     const target = firstLine.split(':')[1]?.trim().replace(/\?$/, '') || '';
     return confirmTool(uiInstance, { toolName: 'writeFile', action, target });
   }
-
   if (firstLine.includes('Apply edit to')) {
     const target = firstLine.replace(/^Apply edit to\s+/, '').replace(/\?$/, '');
     return confirmTool(uiInstance, { toolName: 'editFile', action: 'Apply string replacement', target });
   }
-
   if (firstLine.includes('Permanently delete file:')) {
     const target = firstLine.split(':')[1]?.trim().replace(/\?$/, '') || '';
     return confirmTool(uiInstance, { toolName: 'deleteFile', action: 'Permanently delete file', target });
   }
-
   if (firstLine.includes('Run command') || firstLine.includes('Run:')) {
     const commandText = lines.slice(1).join('\n').trim() || firstLine;
-    return confirmTool(uiInstance, { toolName: 'executeCommand', action: 'Run bash shell command', target: firstLine, details: [commandText] });
+    return confirmTool(uiInstance, {
+      toolName: 'executeCommand',
+      action:   'Run bash shell command',
+      target:   firstLine,
+      details:  [commandText],
+    });
   }
-
   return confirmTool(uiInstance, { toolName: 'confirm', action: question });
 }
