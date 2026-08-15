@@ -30,12 +30,16 @@ Manages model requests, streaming completions (`stream: true`) with live text an
   - `TRANSIENT_NET_CODES`: Retries automatically on transient network error codes (`ECONNRESET`, `ETIMEDOUT`, `ECONNREFUSED`, `EAI_AGAIN`, `ENETUNREACH`, `EHOSTUNREACH`).
   - `maxTurns`: Capped at 15 turns to prevent infinite tool calling loops (reset back to 0 on every successful user follow-up).
   - `MAX_BACKOFF_MS`: Caps exponential/linear retry delays at 30 seconds.
+  - `DEFAULT_CONTEXT_BUDGET_TOKENS`: Conservative context size budget (100,000 tokens).
+  - `COMPACTION_TRIGGER_RATIO`: High-water mark ratio (75% of budget) triggering proactive history pruning.
 * **Key Functions:**
   - `addMessage(role, content, extra)`: Appends messages (`user`, `assistant`, `system`, `tool`) to conversation history.
   - `run(query, systemPrompt)`: Executes the main execution loop. Prints the TrueColor linear gradient logo and word-wrapped prompt, feeds back tool outputs, tracks token usage metrics, intercepts Ctrl+C turn-wide, and boots into an interactive follow-up loop (`ui.askFollowUp()`) until exit (`q`).
   - `handleResponse(message)`: Invoked after each turn. Appends response payload to history. Overridden by `GeminiModel`.
   - `_getCompletion()`: Executes atomic streaming API requests (`stream: true`) using `_abortController.signal`, and feeds chunks to `StreamingText` in real-time.
   - `_processToolCalls(toolCalls)`: Executes non-interactive tool calls in parallel using `Promise.all` while executing interactive tool calls sequentially to avoid terminal input collisions. Respects the `_interrupted` flag to skip subsequent calls.
+  - `_pruneMessagesIfNeeded()`: Proactively trims history if estimated token count crosses the trigger ratio. Prunes complete `assistant`+`tool_calls` and matching `tool` results as atomic pairs, oldest first, while preserving the system prompt and a recent tail of 4 user turns. Slices in a synthetic context notice.
+  - `_emergencyPrune()`: Reactively trims history down aggressively (keeping only system prompt + last 2 user turns) upon encountering context-length-exceeded errors.
 
 ### `default.ts` (`DefaultModel`)
 Standard OpenAI-compatible completion subclass inheriting from `BaseModel`.

@@ -58,6 +58,31 @@ function getDisplayArg(name: string, args: any): string {
   return args.url || args.filePath || args.dirPath || args.path || args.pattern || JSON.stringify(args);
 }
 
+/** Rough token estimate: ~4 chars/token. No tokenizer dependency by design
+ *  (matches the existing character-based approximation used elsewhere in
+ *  this codebase, e.g. webFetch.ts truncation). */
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+function estimateMessagesTokens(messages: any[]): number {
+  let total = 0;
+  for (const m of messages) {
+    if (m && typeof m.content === 'string') {
+      total += estimateTokens(m.content);
+    }
+    if (m && Array.isArray(m.tool_calls)) {
+      for (const tc of m.tool_calls) {
+        total += estimateTokens(JSON.stringify(tc.function?.arguments || ''));
+      }
+    }
+  }
+  return total;
+}
+
+const DEFAULT_CONTEXT_BUDGET_TOKENS = 100000;
+const COMPACTION_TRIGGER_RATIO = 0.75;
+
 /**
  * Base class for AI model interaction handlers.
  * Encapsulates message history, API calling with retries, and robust tool execution.
@@ -72,6 +97,8 @@ export default class BaseModel {
   _runUsage: { prompt: number; completion: number; total: number };
   _interrupted: boolean;
   _abortController: AbortController | null;
+  _didEmergencyPrune: boolean;
+  _cumulativePrunedExchanges: number;
 
   constructor(client: OpenAI, model: string) {
     this.client = client;
@@ -83,6 +110,8 @@ export default class BaseModel {
     this._runUsage = { prompt: 0, completion: 0, total: 0 };
     this._interrupted = false;
     this._abortController = null;
+    this._didEmergencyPrune = false;
+    this._cumulativePrunedExchanges = 0;
   }
 
   /**
@@ -101,6 +130,7 @@ export default class BaseModel {
     this._runUsage = { prompt: 0, completion: 0, total: 0 };
     this._interrupted = false;
     this._abortController = null;
+    this._didEmergencyPrune = false;
 
     if (systemPrompt) {
       this.addMessage('system', systemPrompt);
@@ -316,6 +346,8 @@ export default class BaseModel {
   }
 
   async _getCompletion(): Promise<any> {
+    this._pruneMessagesIfNeeded();
+
     let attempt = 0;
     const maxAttempts = 6;
     const minDelayBetweenRequests = 1000;
@@ -450,6 +482,16 @@ export default class BaseModel {
       } catch (err: any) {
         if (this._interrupted || err.name === 'AbortError' || err.message === 'Aborted') {
           throw new Error('Aborted');
+        }
+
+        const isContextLengthError =
+          err.code === 'context_length_exceeded' ||
+          /context.length|maximum context|too many tokens/i.test(err.message || '');
+
+        if (isContextLengthError && !this._didEmergencyPrune) {
+          this._didEmergencyPrune = true;
+          this._emergencyPrune();
+          continue; // Retry immediately, no backoff delay
         }
 
         const isHttpTransient = [429, 500, 502, 503, 504].includes(err.status);
@@ -613,5 +655,150 @@ export default class BaseModel {
       : '';
 
     ui.log(timeStr + tokenStr);
+  }
+
+  private _pruneMessagesIfNeeded(): void {
+    const currentTotal = estimateMessagesTokens(this.messages);
+    if (currentTotal > DEFAULT_CONTEXT_BUDGET_TOKENS * COMPACTION_TRIGGER_RATIO) {
+      this._pruneHistory(4, COMPACTION_TRIGGER_RATIO);
+    }
+  }
+
+  private _emergencyPrune(): void {
+    this._pruneHistory(2, 0);
+  }
+
+  private _pruneHistory(userTurnsToKeep: number, targetRatio: number): void {
+    let systemStartIndex = 0;
+    if (this.messages[0]?.role === 'system') {
+      systemStartIndex = 1;
+    }
+    
+    let hasNotice = false;
+    let noticeIndex = -1;
+    if (this.messages[systemStartIndex]?.role === 'system' && this.messages[systemStartIndex].content.startsWith('[Context notice:')) {
+      hasNotice = true;
+      noticeIndex = systemStartIndex;
+    }
+    
+    const startIndex = hasNotice ? noticeIndex + 1 : systemStartIndex;
+    
+    let userCount = 0;
+    let tailStartIndex = this.messages.length;
+    for (let i = this.messages.length - 1; i >= 0; i--) {
+      if (this.messages[i].role === 'user') {
+        userCount++;
+        if (userCount === userTurnsToKeep) {
+          tailStartIndex = i;
+          break;
+        }
+      }
+    }
+    
+    const lastUserIndex = this.messages.map(m => m.role).lastIndexOf('user');
+    if (tailStartIndex > lastUserIndex) {
+      tailStartIndex = lastUserIndex;
+    }
+    
+    if (startIndex >= tailStartIndex) {
+      return;
+    }
+    
+    const chunks: { indices: number[], tokenCount: number }[] = [];
+    const visited = new Set<number>();
+    
+    for (let i = startIndex; i < tailStartIndex; i++) {
+      if (visited.has(i)) continue;
+      const msg = this.messages[i];
+      
+      if (msg.role === 'assistant' && Array.isArray(msg.tool_calls)) {
+        const chunkIndices = [i];
+        const toolCallIds = new Set(msg.tool_calls.map((tc: any) => tc.id).filter(Boolean));
+        
+        for (let j = startIndex; j < tailStartIndex; j++) {
+          if (j !== i && !visited.has(j)) {
+            const candidate = this.messages[j];
+            if (candidate.role === 'tool' && toolCallIds.has(candidate.tool_call_id)) {
+              chunkIndices.push(j);
+            }
+          }
+        }
+        
+        for (const idx of chunkIndices) {
+          visited.add(idx);
+        }
+        const tokenCount = estimateMessagesTokens(chunkIndices.map(idx => this.messages[idx]));
+        chunks.push({ indices: chunkIndices, tokenCount });
+      } else if (msg.role === 'tool') {
+        let assistantIdx = -1;
+        for (let j = startIndex; j < tailStartIndex; j++) {
+          const candidate = this.messages[j];
+          if (candidate.role === 'assistant' && Array.isArray(candidate.tool_calls)) {
+            if (candidate.tool_calls.some((tc: any) => tc.id === msg.tool_call_id)) {
+              assistantIdx = j;
+              break;
+            }
+          }
+        }
+        
+        if (assistantIdx !== -1) {
+          const chunkIndices = [assistantIdx];
+          const assistantMsg = this.messages[assistantIdx];
+          const toolCallIds = new Set(assistantMsg.tool_calls.map((tc: any) => tc.id).filter(Boolean));
+          for (let j = startIndex; j < tailStartIndex; j++) {
+            if (j !== assistantIdx && !visited.has(j)) {
+              const candidate = this.messages[j];
+              if (candidate.role === 'tool' && toolCallIds.has(candidate.tool_call_id)) {
+                chunkIndices.push(j);
+              }
+            }
+          }
+          for (const idx of chunkIndices) {
+            visited.add(idx);
+          }
+          const tokenCount = estimateMessagesTokens(chunkIndices.map(idx => this.messages[idx]));
+          chunks.push({ indices: chunkIndices, tokenCount });
+        } else {
+          visited.add(i);
+        }
+      } else {
+        visited.add(i);
+        const tokenCount = estimateMessagesTokens([msg]);
+        chunks.push({ indices: [i], tokenCount });
+      }
+    }
+    
+    const indicesToPrune = new Set<number>();
+    let currentTotalTokens = estimateMessagesTokens(this.messages);
+    const targetTokens = DEFAULT_CONTEXT_BUDGET_TOKENS * targetRatio;
+    
+    let prunedCount = 0;
+    for (const chunk of chunks) {
+      if (currentTotalTokens <= targetTokens) break;
+      for (const idx of chunk.indices) {
+        indicesToPrune.add(idx);
+      }
+      currentTotalTokens -= chunk.tokenCount;
+      prunedCount++;
+    }
+    
+    if (indicesToPrune.size > 0) {
+      this._cumulativePrunedExchanges += prunedCount;
+      const noticeText = `[Context notice: ${this._cumulativePrunedExchanges} earlier tool-call exchanges were pruned from this session to stay within context limits. Earlier file reads/searches are no longer in context — re-read files if needed.]`;
+      
+      const newMessages = this.messages.filter((_, idx) => !indicesToPrune.has(idx));
+      
+      let newSystemStartIndex = 0;
+      if (newMessages[0]?.role === 'system') {
+        newSystemStartIndex = 1;
+      }
+      
+      if (newMessages[newSystemStartIndex]?.role === 'system' && newMessages[newSystemStartIndex].content.startsWith('[Context notice:')) {
+        newMessages[newSystemStartIndex] = { ...newMessages[newSystemStartIndex], content: noticeText };
+      } else {
+        newMessages.splice(newSystemStartIndex, 0, { role: 'system', content: noticeText });
+      }
+      this.messages = newMessages;
+    }
   }
 }
