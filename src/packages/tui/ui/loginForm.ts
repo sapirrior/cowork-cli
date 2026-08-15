@@ -82,15 +82,10 @@ export async function selectProvider(uiInstance: UIInstance, items: SelectorItem
     };
 
     cleanup = () => {
-      if (process.stdin.isTTY) {
-        process.stdin.setRawMode(false);
-      }
+      // TerminalEngine owns rawMode — do not toggle it here.
       process.stdin.off('data', onData);
     };
 
-    if (process.stdin.isTTY) {
-      process.stdin.setRawMode(true);
-    }
     process.stdin.ref();
     process.stdin.resume();
     process.stdin.on('data', onData);
@@ -233,15 +228,10 @@ export async function inputField(
     };
 
     cleanup = () => {
-      if (process.stdin.isTTY) {
-        process.stdin.setRawMode(false);
-      }
+      // TerminalEngine owns rawMode — do not toggle it here.
       process.stdin.off('data', onData);
     };
 
-    if (process.stdin.isTTY) {
-      process.stdin.setRawMode(true);
-    }
     process.stdin.ref();
     process.stdin.resume();
     process.stdin.on('data', onData);
