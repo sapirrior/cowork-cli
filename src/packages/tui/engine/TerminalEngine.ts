@@ -77,6 +77,12 @@ export default class TerminalEngine {
 
     // Window resize & zoom handler: debounced for smooth reflow
     this.resizeHandler = () => {
+      // Immediately invalidate the diff baseline so any frames rendered during
+      // the debounce window (e.g. a spinner tick) do a full repaint rather
+      // than diffing against stale old-width lines. Without this, the cursor
+      // gets placed at the wrong row during the resize animation.
+      this.renderer.clearPreviousFrameRecord();
+
       if (this.resizeTimer) {
         clearTimeout(this.resizeTimer);
       }
@@ -91,8 +97,7 @@ export default class TerminalEngine {
         // After a resize, content re-wraps at the new width, invalidating any
         // raw-row scroll offset. Clamp to bottom (offset=0) so the user always
         // sees the most recent content rather than a stale offset pointing into
-        // nothing. If the user was scrolled up intentionally, they lose position,
-        // but that is far better than history appearing to vanish.
+        // nothing.
         if (this.scrollOffset > 0) {
           this.scrollOffset = 0;
         }

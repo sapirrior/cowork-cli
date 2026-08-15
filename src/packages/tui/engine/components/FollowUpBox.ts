@@ -12,11 +12,16 @@ interface FollowUpBoxState {
   cursorIndex: number;
 }
 
-// The visible prefix rendered inside the box: "> " (2 display columns)
-const PREFIX     = '> ';
+// Prefix: "> " at column 0, no indent
+const PREFIX      = '> ';
 const PREFIX_COLS = 2;
-const INDENT      = 2;   // "  " before the ❯
 const PLACEHOLDER = 'Type your follow-up…';
+
+// Thin grey border — one shade darker than THEME.formatDim to stay subtle
+function greyBorder(width: number): string {
+  // Use explicit grey RGB so it renders identically regardless of terminal theme
+  return `\x1b[38;2;75;75;75m${'─'.repeat(Math.max(1, width - 1))}\x1b[0m`;
+}
 
 export default class FollowUpBox extends Component<FollowUpBoxProps, FollowUpBoxState> {
   constructor(props: FollowUpBoxProps = {}) {
@@ -29,62 +34,60 @@ export default class FollowUpBox extends Component<FollowUpBoxProps, FollowUpBox
 
   /**
    * Cursor sits on line 1 (the input line; line 0 = top border).
-   * Column = INDENT + PREFIX_COLS + visual offset within current line + 1 (1-indexed).
+   * Column = PREFIX_COLS + visual offset within the current wrapped line + 1 (1-indexed).
+   * No indent — > is at column 0.
    */
   override getCursorPosition(): { line: number; column: number } {
     const width = process.stdout.columns || 80;
-    const maxContentCols = Math.max(10, width - 1 - INDENT - PREFIX_COLS);
+    // Content columns = total width minus the "> " prefix (no indent)
+    const maxContentCols = Math.max(10, width - 1 - PREFIX_COLS);
 
     const { currentVal, cursorIndex } = this.state;
-    // Visual offset of the cursor within the raw text
     const totalOffset = visualCursorOffset(currentVal, cursorIndex);
 
     const cursorLineOffset = Math.floor(totalOffset / maxContentCols);
     const cursorColOffset  = totalOffset % maxContentCols;
 
     return {
-      line:   1 + cursorLineOffset,           // 1 = first content line (after top border)
-      column: INDENT + PREFIX_COLS + cursorColOffset + 1, // 1-indexed
+      line:   1 + cursorLineOffset,      // line 0 = top border, line 1 = first content line
+      column: PREFIX_COLS + cursorColOffset + 1, // 1-indexed, no indent
     };
   }
 
   override render(): string[] {
     const { currentVal } = this.state;
     const width = process.stdout.columns || 80;
-    const borderLine = THEME.formatDim('─'.repeat(width - 1));
-    const maxContentCols = Math.max(10, width - 1 - INDENT - PREFIX_COLS);
+    const border = greyBorder(width);
+    // Content columns: full width minus "> " prefix, no indent
+    const maxContentCols = Math.max(10, width - 1 - PREFIX_COLS);
 
     const lines: string[] = [];
 
-    // ── Top border ──────────────────────────────────────────────────
-    lines.push(borderLine);
+    // ── Top border ────────────────────────────────────────────────────
+    lines.push(border);
 
-    // ── Input line(s) ───────────────────────────────────────────────
-    const indent = '  '; // INDENT spaces
-    const prefixStyled = `${THEME.formatMain('> ')}`;
+    // ── Input line(s) ─────────────────────────────────────────────────
+    const prefixStyled = THEME.formatMain('> ');
 
     if (currentVal.length === 0) {
-      // Show dim placeholder when empty
-      lines.push(`${indent}${prefixStyled}${THEME.formatDim(PLACEHOLDER)}`);
+      lines.push(`${prefixStyled}${THEME.formatDim(PLACEHOLDER)}`);
     } else {
-      // Unicode-safe line wrapping on the raw text (no ANSI inside slice)
       const contentLines = wrapByVisualWidth(currentVal, maxContentCols);
-      lines.push(`${indent}${prefixStyled}${contentLines[0]}`);
+      lines.push(`${prefixStyled}${contentLines[0]}`);
       for (let i = 1; i < contentLines.length; i++) {
-        // Continuation lines: indent + prefix-width spaces to align text
-        lines.push(`${indent}${' '.repeat(PREFIX_COLS)}${contentLines[i]}`);
+        // Continuation lines: align text under first line (PREFIX_COLS spaces)
+        lines.push(`${' '.repeat(PREFIX_COLS)}${contentLines[i]}`);
       }
     }
 
-    // ── Bottom border ────────────────────────────────────────────────
-    lines.push(borderLine);
+    // ── Bottom border ─────────────────────────────────────────────────
+    lines.push(border);
 
-    // ── Footer hint line ─────────────────────────────────────────────
-    const leftHint  = THEME.formatDim('ctrl+c to cancel');
-    const rightHint = THEME.formatDim('Enter to send ↵');
-    // Use raw lengths for spacing math (dim wrapping is ANSI, not visual chars)
+    // ── Footer hint line ──────────────────────────────────────────────
     const leftRaw   = 'ctrl+c to cancel';
     const rightRaw  = 'Enter to send ↵';
+    const leftHint  = THEME.formatDim(leftRaw);
+    const rightHint = THEME.formatDim(rightRaw);
     const gap = Math.max(1, (width - 1) - leftRaw.length - rightRaw.length);
     lines.push(`${leftHint}${' '.repeat(gap)}${rightHint}`);
 
