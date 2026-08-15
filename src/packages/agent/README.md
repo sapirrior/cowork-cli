@@ -30,7 +30,7 @@ Every tool has an implementation file in `tools/` and a corresponding schema in 
 | `readFileChunk.ts` | `readFileChunk` | Reads specific line ranges (1-based index) from a file. | Prevents high memory consumption on large codebases. |
 | `searchText.ts` | `searchText` | Regular expression search within files and folders. | Returns matching lines with a configurable number of context lines (max 5). Rejects binary files. |
 | `webFetch.ts` | `webFetch` | Downloads page content or JSON payloads from a URL. | Strips HTML tags (`script`, `style`, `nav`, etc.). Hardened with manual redirect handling and DNS check for SSRF protection. Approximates character limit to 15,000. |
-| `webSearch.ts` | `webSearch` | Performs a web search using DuckDuckGo HTML. | Parses query results into title, URL, and snippet keys. Output is strictly returned in JSON format. Max 20 results. |
+| `webSearch.ts` | `webSearch` | Performs a web search using DuckDuckGo HTML. | Parses query results into title, URL, and snippet keys. Max 20 results. Surfaces explicit scraper/unrecognized page structure errors. |
 | `findFile.ts` | `findFile` | Finds files matching a filename regex pattern. | Recursively walks the directory (max depth 10) matching patterns. Max 15 results. |
 | `findDir.ts` | `findDir` | Finds folders matching a folder name regex pattern. | Recursively walks directories matching patterns. Max 15 results. |
 | `askUser.ts` | `askUser` | Solicits text input from the user in the console. | Suspends the visual loader/spinner during prompt lifecycle. |

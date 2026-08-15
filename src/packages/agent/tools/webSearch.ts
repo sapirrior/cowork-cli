@@ -48,6 +48,14 @@ export default async function webSearch({ query, limit = 5 }: WebSearchArgs): Pr
     const results: { title: string; url: string; snippet: string }[] = [];
     
     const root = parse(html);
+    const hasResultsShell = root.querySelector('.results, #links, .no-results') !== null;
+
+    if (!hasResultsShell) {
+      return JSON.stringify({
+        error: 'Search provider returned an unrecognized page structure. The scraper may need maintenance.',
+      });
+    }
+
     const resultNodes = root.querySelectorAll('.result__body');
     
     for (const node of resultNodes) {
