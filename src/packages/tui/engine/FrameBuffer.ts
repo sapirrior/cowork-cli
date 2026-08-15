@@ -9,8 +9,13 @@ export interface DocumentFrame {
   currentScrollOffset: number;
 }
 
-function getStringWidth(str: string): number {
-  return stringWidth(str);
+function getStringWidth(str: string, cache: Map<string, number>): number {
+  let w = cache.get(str);
+  if (w === undefined) {
+    w = stringWidth(str);
+    cache.set(str, w);
+  }
+  return w;
 }
 
 export function computeDocumentFrame(
@@ -18,7 +23,8 @@ export function computeDocumentFrame(
   termWidth: number,
   termHeight: number,
   scrollOffset: number = 0,
-  forceAll: boolean = false
+  forceAll: boolean = false,
+  lineWidthCache: Map<string, number> = new Map()
 ): DocumentFrame {
   const nodes = tree.getNodes();
   const allLines: string[] = [];
@@ -43,7 +49,7 @@ export function computeDocumentFrame(
   const visualRowHeights: number[] = [];
   let totalVisualRows = 0;
   for (const line of allLines) {
-    const width = getStringWidth(line);
+    const width = getStringWidth(line, lineWidthCache);
     const rows = Math.max(1, Math.ceil(width / termWidth));
     visualRowHeights.push(rows);
     totalVisualRows += rows;
@@ -56,7 +62,6 @@ export function computeDocumentFrame(
   // Determine viewport lines based on scroll offset
   let accumulatedRowsFromBottom = 0;
   let endIndex = allLines.length;
-  let startIndex = 0;
 
   for (let i = allLines.length - 1; i >= 0; i--) {
     if (accumulatedRowsFromBottom >= clampedScroll) {
@@ -67,6 +72,7 @@ export function computeDocumentFrame(
   }
 
   let viewportRows = 0;
+  let startIndex = 0;
   const viewportLines: string[] = [];
   for (let i = endIndex - 1; i >= 0; i--) {
     const rows = visualRowHeights[i];
@@ -78,7 +84,7 @@ export function computeDocumentFrame(
     viewportRows += rows;
   }
 
-  // Calculate physical screen row for cursor by summing visualRowHeights of preceding lines in viewport
+  // Calculate physical screen row for cursor
   let cursorViewportRow = -1;
   if (cursorLineIndex >= startIndex && cursorLineIndex < endIndex) {
     let physicalRow = 0;

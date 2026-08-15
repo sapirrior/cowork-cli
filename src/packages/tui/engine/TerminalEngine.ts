@@ -59,6 +59,10 @@ export default class TerminalEngine {
   private resizeTimer: NodeJS.Timeout | null = null;
   private idCounter = 0;
   private pendingForceFull = false;
+  /** Per-process-lifetime cache mapping line strings → visual column width.
+   *  History lines are immutable once committed, so this cache never needs
+   *  eviction. Only live component lines (spinner, input) can miss. */
+  private lineWidthCache: Map<string, number> = new Map();
 
   constructor() {
     this.tree = new DocumentTree();
@@ -326,7 +330,9 @@ export default class TerminalEngine {
         const shouldForceFull = this.pendingForceFull;
         this.pendingForceFull = false;
         if (this.inAlternateScreen) {
-          const frame = this.renderer.render(this.tree, this.scrollOffset, shouldForceFull);
+          const frame = this.renderer.render(
+            this.tree, this.scrollOffset, shouldForceFull, this.lineWidthCache
+          );
           this.scrollOffset = frame.currentScrollOffset;
         }
       }
