@@ -40,6 +40,6 @@ Every tool has an implementation file in `tools/` and a corresponding schema in 
 | `gitStatus.ts` | `gitStatus` | Exposes porcelain git working tree status. | Parses status indicators (`M`, `A`, `D`, etc.) and groups by Staged, Unstaged, and Untracked. |
 | `readManyFiles.ts` | `readManyFiles` | Walks and consolidates matching text files. | Matches include/exclude globs. Automatically skips binary files unless explicitly requested. Filters out `.gitignore` files. Safe handle close lifecycle. |
 | `writeFile.ts` | `writeFile` | Creates or overwrites a file. | Requires mandatory user confirmation. Resolves paths safely. |
-| `editFile.ts` | `editFile` | Edits an existing file via string replacement. | Shows preview of changes and requires user confirmation. |
+| `editFile.ts` | `editFile` | Edits an existing file via string replacement. | Shows preview of changes and requires user confirmation. The target text must match exactly one location in the file. |
 | `deleteFile.ts` | `deleteFile` | Permanently deletes a single file. | Cannot delete directories. Requires mandatory confirmation. |
 | `executeCommand.ts` | `executeCommand` | Executes a shell command via bash securely. | Requires user confirmation. Enforces sandbox path boundaries, security guards against dangerous commands, non-interactive environment flags, configurable timeouts (default 60s, max 300s), and head+tail log truncation. |

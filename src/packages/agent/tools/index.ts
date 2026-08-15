@@ -293,12 +293,12 @@ export const toolDefinitions: OpenAI.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "editFile",
-      description: "Edit an existing file by replacing a specific block of text with new text. Requires user confirmation before applying.",
+      description: "Edit an existing file by replacing a specific block of text with new text. Requires user confirmation before applying. oldText must match exactly one location in the file.",
       parameters: {
         type: "object",
         properties: {
           filePath: { type: "string", description: "Relative path of the file to edit." },
-          oldText:  { type: "string", description: "Exact text to find and replace in the file." },
+          oldText:  { type: "string", description: "Exact text to find and replace in the file. Must match exactly one location." },
           newText:  { type: "string", description: "Text to replace oldText with." }
         },
         required: ["filePath", "oldText", "newText"],

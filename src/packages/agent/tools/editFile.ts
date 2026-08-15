@@ -39,6 +39,11 @@ export default async function editFile(args: EditFileArgs): Promise<string> {
   }
 
   const occurrences = content.split(oldText).length - 1;
+
+  if (occurrences > 1) {
+    return `Error: '${oldText.slice(0, 80)}${oldText.length > 80 ? '…' : ''}' matches ${occurrences} locations in '${filePath}'. Provide more surrounding context in oldText so it matches exactly one location.`;
+  }
+
   const relativePath = path.relative(process.cwd(), resolvedPath);
 
   const diffDetails = [
