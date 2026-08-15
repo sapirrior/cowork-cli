@@ -89,19 +89,9 @@ class UIEngine {
         }
       };
 
-      const cleanup = () => {
-        if (process.stdin.isTTY) {
-          process.stdin.setRawMode(false);
-        }
-        process.stdin.off('data', onData);
-      };
+      // TerminalEngine owns rawMode — don't toggle it here.
+      const cleanup = () => { process.stdin.off('data', onData); };
 
-      if (process.stdin.isTTY) {
-        process.stdin.setRawMode(true);
-      }
-      try {
-        process.stdin.read();
-      } catch {}
       process.stdin.ref();
       process.stdin.resume();
       process.stdin.on('data', onData);

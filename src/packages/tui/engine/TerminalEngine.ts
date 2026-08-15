@@ -100,51 +100,40 @@ export default class TerminalEngine {
       }, 50);
     };
 
-    // Input handler for scroll events & arrow navigation in Alternate Screen mode
+    // Input handler for scroll events & arrow navigation in Alternate Screen mode.
+    // This listener is active whenever the alternate screen is open — including
+    // during response generation — so the user can scroll at any time.
+    // Interactive prompts (ask / confirmTool) temporarily take over stdin with
+    // their own 'data' listeners; they do NOT remove this one, so both coexist.
     this.inputHandler = (data: Buffer) => {
       if (!this.inAlternateScreen) return;
       const str = data.toString();
 
-      // Check if an interactive input component is handling keyboard navigation
-      const hasInteractiveComponent = this.components.some(c => typeof (c as any).handleInput === 'function');
+      // When an interactive prompt is active it owns the keystrokes; only
+      // handle scroll-specific sequences here so we don't interfere.
+      const promptActive = (globalThis as any).__promptActive === true;
 
-      if (!hasInteractiveComponent) {
-        // Up Arrow key: scroll up 1 line
-        if (str === '\x1b[A') {
-          this.scrollUp(1);
-          return;
-        }
-        // Down Arrow key: scroll down 1 line
-        if (str === '\x1b[B') {
-          this.scrollDown(1);
-          return;
-        }
+      if (!promptActive) {
+        // Up / Down Arrow: scroll 1 line
+        if (str === '\x1b[A') { this.scrollUp(1);   return; }
+        if (str === '\x1b[B') { this.scrollDown(1); return; }
       }
 
-      // Mouse wheel scroll up / PageUp: \x1b[<64; or \x1b[5~
-      if (str.includes('\x1b[<64;') || str.includes('\x1b[5~')) {
-        this.scrollUp(3);
-      }
-      // Mouse wheel scroll down / PageDown: \x1b[<65; or \x1b[6~
-      else if (str.includes('\x1b[<65;') || str.includes('\x1b[6~')) {
-        this.scrollDown(3);
-      }
-      // Home key (scroll to top): \x1b[1~
-      else if (str.includes('\x1b[1~')) {
-        this.scrollUp(999999);
-      }
-      // End key (scroll to bottom): \x1b[4~
-      else if (str.includes('\x1b[4~')) {
-        this.scrollToBottom();
-      }
+      // PageUp / PageDown (always allowed)
+      if (str === '\x1b[5~') { this.scrollUp(5);       return; }
+      if (str === '\x1b[6~') { this.scrollDown(5);     return; }
+      // Home / End
+      if (str === '\x1b[H' && !promptActive) { this.scrollUp(999999);  return; }
+      if (str === '\x1b[F' && !promptActive) { this.scrollToBottom();  return; }
     };
 
     // Restore terminal cursor visibility synchronously on exit if unhandled
     process.on('exit', () => {
       this.showCursor();
       if (this.inAlternateScreen) {
-        process.stdout.write('\x1b[?1007l\x1b[?1006l\x1b[?1002l\x1b[?1000l\x1b[?1049l');
+        process.stdout.write('\x1b[?1007l\x1b[?1049l');
         this.inAlternateScreen = false;
+        try { if (process.stdin.isTTY) process.stdin.setRawMode(false); } catch {}
         const lines = this.history.getPrimaryScreenLines();
         for (const line of lines) {
           process.stdout.write(line + '\n');
@@ -182,9 +171,19 @@ export default class TerminalEngine {
    */
   ensureAlternateScreen(): void {
     if (!this.inAlternateScreen) {
-      process.stdout.write('\x1b[?1049h\x1b[H\x1b[?1000h\x1b[?1002h\x1b[?1006h\x1b[?1007h');
+      // Enter Alternate Screen. Do NOT enable SGR mouse tracking
+      // (\x1b[?1000h/1002h/1006h) — on Termux those events arrive on stdin
+      // as raw bytes that get echoed as visible garbage when rawMode is off.
+      // xterm Alternate Scroll (\x1b[?1007h) translates scroll wheel to
+      // arrow keys without any mouse-report side effects.
+      process.stdout.write('\x1b[?1049h\x1b[H\x1b[?1007h');
       this.inAlternateScreen = true;
       if (process.stdin.isTTY) {
+        // Keep stdin in raw mode permanently while in the alternate screen so
+        // the inputHandler receives keystrokes (including scroll-key sequences)
+        // even during response generation when no interactive prompt is active.
+        process.stdin.setRawMode(true);
+        process.stdin.resume();
         process.stdin.on('data', this.inputHandler);
       }
       process.stdout.on('resize', this.resizeHandler);
@@ -198,10 +197,13 @@ export default class TerminalEngine {
   async flushHistoryToPrimaryScreen(): Promise<void> {
     this.showCursor();
     if (this.inAlternateScreen) {
-      process.stdout.write('\x1b[?1007l\x1b[?1006l\x1b[?1002l\x1b[?1000l\x1b[?1049l');
+      process.stdout.write('\x1b[?1007l\x1b[?1049l');
       this.inAlternateScreen = false;
       if (process.stdin.isTTY) {
         process.stdin.off('data', this.inputHandler);
+        // Restore non-raw mode on exit so the shell prompt isn't broken
+        try { process.stdin.setRawMode(false); } catch {}
+        process.stdin.pause();
       }
       if (this.resizeTimer) {
         clearTimeout(this.resizeTimer);

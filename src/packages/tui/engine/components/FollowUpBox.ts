@@ -12,8 +12,8 @@ interface FollowUpBoxState {
   cursorIndex: number;
 }
 
-// The visible prefix rendered inside the box: "❯ " (2 display columns)
-const PREFIX     = '❯ ';
+// The visible prefix rendered inside the box: "> " (2 display columns)
+const PREFIX     = '> ';
 const PREFIX_COLS = 2;
 const INDENT      = 2;   // "  " before the ❯
 const PLACEHOLDER = 'Type your follow-up…';
@@ -61,7 +61,7 @@ export default class FollowUpBox extends Component<FollowUpBoxProps, FollowUpBox
 
     // ── Input line(s) ───────────────────────────────────────────────
     const indent = '  '; // INDENT spaces
-    const prefixStyled = `${THEME.formatMain(PREFIX)}`;
+    const prefixStyled = `${THEME.formatMain('> ')}`;
 
     if (currentVal.length === 0) {
       // Show dim placeholder when empty

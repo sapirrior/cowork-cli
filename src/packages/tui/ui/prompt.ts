@@ -16,17 +16,24 @@ export function isPromptActive(): boolean {
   return activePromptLock;
 }
 
+/**
+ * Set the prompt active state both locally and on globalThis so TerminalEngine's
+ * scroll handler knows to defer Up/Down arrow handling to the prompt.
+ */
+function setPromptActive(val: boolean): void {
+  activePromptLock = val;
+  (globalThis as any).__promptActive = val;
+}
+
 // ─── Word-navigation helpers ──────────────────────────────────────────────────
 
 function wordRight(buf: string, idx: number): number {
-  // Skip current non-space run, then skip spaces
   while (idx < buf.length && buf[idx] !== ' ') idx++;
   while (idx < buf.length && buf[idx] === ' ') idx++;
   return idx;
 }
 
 function wordLeft(buf: string, idx: number): number {
-  // Skip spaces to the left, then skip non-space run
   while (idx > 0 && buf[idx - 1] === ' ') idx--;
   while (idx > 0 && buf[idx - 1] !== ' ') idx--;
   return idx;
@@ -40,13 +47,11 @@ interface InputState {
 }
 
 type UpdateCallback = (state: InputState) => void;
-type ResolveCallback = (value: string) => void;
-type RejectCallback  = (reason: any)  => void;
 
 /**
  * Handles a raw terminal keypress for a text input field.
- * Returns true if the event was consumed and should not propagate further.
- * Returns 'submit' when the user presses Enter, 'cancel' on Ctrl+C.
+ * Returns 'submit' when the user presses Enter, 'cancel' on Ctrl+C,
+ * 'consumed' for all other handled keys, or 'unhandled' for unknown input.
  */
 function handleInputKey(
   str: string,
@@ -61,30 +66,25 @@ function handleInputKey(
   // ── Submit ────────────────────────────────────────────────────────
   if (str === '\r' || str === '\n') return 'submit';
 
-  // ── Ignore unrelated escape sequences early ───────────────────────
-  // (we handle known ones below; unknown ones are silently dropped)
-
   // ── Arrow keys: character navigation ─────────────────────────────
-  if (str === '\u001b[D') {               // Left Arrow
+  if (str === '\u001b[D') {
     cursorIndex = Math.max(0, cursorIndex - 1);
     onUpdate({ buffer, cursorIndex });
     return 'consumed';
   }
-  if (str === '\u001b[C') {               // Right Arrow
+  if (str === '\u001b[C') {
     cursorIndex = Math.min(buffer.length, cursorIndex + 1);
     onUpdate({ buffer, cursorIndex });
     return 'consumed';
   }
 
-  // ── Word navigation (Ctrl+Left / Ctrl+Right) ──────────────────────
-  // Termux / most terminals send \x1b[1;5D and \x1b[1;5C,
-  // but also common: \x1bb (Alt+b) and \x1bf (Alt+f) in readline style
-  if (str === '\u001b[1;5D' || str === '\u001bb') {  // Ctrl+Left / Alt+b
+  // ── Word navigation (Ctrl+Left / Ctrl+Right / Alt+b / Alt+f) ─────
+  if (str === '\u001b[1;5D' || str === '\u001bb') {
     cursorIndex = wordLeft(buffer, cursorIndex);
     onUpdate({ buffer, cursorIndex });
     return 'consumed';
   }
-  if (str === '\u001b[1;5C' || str === '\u001bf') {  // Ctrl+Right / Alt+f
+  if (str === '\u001b[1;5C' || str === '\u001bf') {
     cursorIndex = wordRight(buffer, cursorIndex);
     onUpdate({ buffer, cursorIndex });
     return 'consumed';
@@ -112,7 +112,7 @@ function handleInputKey(
     return 'consumed';
   }
 
-  // ── Ctrl+Backspace / Ctrl+W — delete word to the left ─────────────
+  // ── Ctrl+W / Ctrl+Backspace — delete word to the left ────────────
   if (str === '\u0017') {
     const newIdx = wordLeft(buffer, cursorIndex);
     buffer = buffer.slice(0, newIdx) + buffer.slice(cursorIndex);
@@ -149,9 +149,9 @@ function handleInputKey(
 
 function getToolLabel(toolName: string, action?: string): string {
   const clean = toolName.toLowerCase();
-  if (clean.includes('write'))                            return 'writing file';
-  if (clean.includes('edit'))                             return 'editing file';
-  if (clean.includes('delete'))                           return 'deleting file';
+  if (clean.includes('write'))                             return 'writing file';
+  if (clean.includes('edit'))                              return 'editing file';
+  if (clean.includes('delete'))                            return 'deleting file';
   if (clean.includes('command') || clean.includes('exec')) return 'running command';
   return action || toolName;
 }
@@ -162,10 +162,10 @@ export async function ask(uiInstance: UIInstance, question: string): Promise<str
   if (activePromptLock) {
     throw new Error('Another interactive prompt is already active.');
   }
-  activePromptLock = true;
+  setPromptActive(true);
   uiInstance._abortActiveSpinner();
   if (!process.stdin.isTTY) {
-    activePromptLock = false;
+    setPromptActive(false);
     throw new Error('stdin is not a TTY');
   }
 
@@ -207,12 +207,10 @@ export async function ask(uiInstance: UIInstance, question: string): Promise<str
       }
     };
 
-    cleanup = () => {
-      if (process.stdin.isTTY) process.stdin.setRawMode(false);
-      process.stdin.off('data', onData);
-    };
+    // TerminalEngine owns rawMode — we do NOT toggle it here.
+    // We just add our listener on top of the engine's existing listener.
+    cleanup = () => { process.stdin.off('data', onData); };
 
-    if (process.stdin.isTTY) process.stdin.setRawMode(true);
     process.stdin.ref();
     process.stdin.resume();
     process.stdin.on('data', onData);
@@ -222,7 +220,7 @@ export async function ask(uiInstance: UIInstance, question: string): Promise<str
   process.once('exit', exitCleanup);
 
   return promise.finally(() => {
-    activePromptLock = false;
+    setPromptActive(false);
     process.off('exit', exitCleanup);
   });
 }
@@ -233,10 +231,10 @@ export async function askFollowUp(uiInstance: UIInstance): Promise<string> {
   if (activePromptLock) {
     throw new Error('Another interactive prompt is already active.');
   }
-  activePromptLock = true;
+  setPromptActive(true);
   uiInstance._abortActiveSpinner();
   if (!process.stdin.isTTY) {
-    activePromptLock = false;
+    setPromptActive(false);
     throw new Error('stdin is not a TTY');
   }
 
@@ -261,7 +259,7 @@ export async function askFollowUp(uiInstance: UIInstance): Promise<string> {
         cleanup();
         uiInstance.engine.unmountAll();
         uiInstance.engine.commit('raw', [
-          `${THEME.formatMain('❯')} ${rgb(THEME.error, 'cancelled')}`
+          `> ${rgb(THEME.error, 'cancelled')}`
         ]);
         reject({ cancelled: true });
         return;
@@ -275,13 +273,9 @@ export async function askFollowUp(uiInstance: UIInstance): Promise<string> {
       }
     };
 
-    cleanup = () => {
-      if (process.stdin.isTTY) process.stdin.setRawMode(false);
-      process.stdin.off('data', onData);
-    };
+    // TerminalEngine owns rawMode — we do NOT toggle it here.
+    cleanup = () => { process.stdin.off('data', onData); };
 
-    if (process.stdin.isTTY) process.stdin.setRawMode(true);
-    try { process.stdin.read(); } catch {}
     process.stdin.ref();
     process.stdin.resume();
     process.stdin.on('data', onData);
@@ -291,7 +285,7 @@ export async function askFollowUp(uiInstance: UIInstance): Promise<string> {
   process.once('exit', exitCleanup);
 
   return promise.finally(() => {
-    activePromptLock = false;
+    setPromptActive(false);
     process.off('exit', exitCleanup);
   });
 }
@@ -312,11 +306,11 @@ export async function confirmTool(
   if (activePromptLock) {
     throw new Error('Another interactive prompt is already active.');
   }
-  activePromptLock = true;
+  setPromptActive(true);
 
   uiInstance._abortActiveSpinner();
   if (!process.stdin.isTTY) {
-    activePromptLock = false;
+    setPromptActive(false);
     return { confirmed: false, dismissed: true };
   }
 
@@ -400,13 +394,9 @@ export async function confirmTool(
       }
     };
 
-    cleanup = () => {
-      if (process.stdin.isTTY) process.stdin.setRawMode(false);
-      process.stdin.off('data', onData);
-    };
+    // TerminalEngine owns rawMode — we do NOT toggle it here.
+    cleanup = () => { process.stdin.off('data', onData); };
 
-    if (process.stdin.isTTY) process.stdin.setRawMode(true);
-    try { process.stdin.read(); } catch {}
     process.stdin.ref();
     process.stdin.resume();
     process.stdin.on('data', onData);
@@ -416,7 +406,7 @@ export async function confirmTool(
   process.once('exit', exitCleanup);
 
   return promise.finally(() => {
-    activePromptLock = false;
+    setPromptActive(false);
     process.off('exit', exitCleanup);
   });
 }
