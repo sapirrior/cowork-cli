@@ -58,6 +58,7 @@ export default class TerminalEngine {
   private inputHandler: (data: Buffer) => void;
   private resizeTimer: NodeJS.Timeout | null = null;
   private idCounter = 0;
+  private pendingForceFull = false;
 
   constructor() {
     this.tree = new DocumentTree();
@@ -315,14 +316,17 @@ export default class TerminalEngine {
    * Request a redraw frame on the next tick.
    */
   requestFrame(forceFull = false): void {
+    this.pendingForceFull = this.pendingForceFull || forceFull;
     if (this.dirty) return;
     this.dirty = true;
 
     process.nextTick(() => {
       if (this.dirty) {
         this.dirty = false;
+        const shouldForceFull = this.pendingForceFull;
+        this.pendingForceFull = false;
         if (this.inAlternateScreen) {
-          const frame = this.renderer.render(this.tree, this.scrollOffset, forceFull);
+          const frame = this.renderer.render(this.tree, this.scrollOffset, shouldForceFull);
           this.scrollOffset = frame.currentScrollOffset;
         }
       }
