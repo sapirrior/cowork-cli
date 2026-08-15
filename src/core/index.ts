@@ -84,7 +84,7 @@ export default async function main(args: string[]): Promise<void> {
   }
   
   // Silent connectivity check: logs only on failure
-  const isConnected = await verifyConnectivity(client);
+  const isConnected = await verifyConnectivity(client, config?.model_name);
   if (!isConnected) {
     process.exitCode = 1;
     await ui.cleanup();

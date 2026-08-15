@@ -105,12 +105,28 @@ export const validateConfig = (config: Config | null | undefined): config is Con
   return isValidConfigObject(config);
 };
 
-export const verifyConnectivity = async (client: OpenAI): Promise<boolean> => {
+export const verifyConnectivity = async (client: OpenAI, model?: string): Promise<boolean> => {
   try {
     await client.models.list();
     return true;
-  } catch (err: any) {
-    logger.error(`Connection verification failed: ${err.message}`);
-    return false;
+  } catch (primaryErr: any) {
+    // Some OpenAI-compatible providers (e.g. Ollama's shim, certain custom
+    // endpoints) do not reliably implement GET /models. Before declaring the
+    // provider unreachable, fall back to a minimal completion probe.
+    if (!model) {
+      logger.error(`Connection verification failed: ${primaryErr.message}`);
+      return false;
+    }
+    try {
+      await client.chat.completions.create({
+        model,
+        messages: [{ role: 'user', content: 'ping' }],
+        max_tokens: 1,
+      });
+      return true;
+    } catch (fallbackErr: any) {
+      logger.error(`Connection verification failed: ${fallbackErr.message}`);
+      return false;
+    }
   }
 };

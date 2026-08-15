@@ -16,7 +16,7 @@ This package is responsible for reading and validating credentials/model setups 
 | | `runLoginWizard` | Export | Exposes setup wizard runner. |
 | `configManager.ts` | `loadConfig()` | Function | Reads credentials from `~/.config/sonnet/auth.json`. Supports providers: `openai`, `gemini`, `ollama`, `openrouter`, `custom`. Falls back to legacy `.env`. |
 | | `validateConfig(config)` | Function | Verifies all required fields are present and that `model_type` is one of: `openai`, `gemini`, `ollama`, `openrouter`, `custom`. |
-| | `verifyConnectivity(client)` | Function | Asynchronous connection test via `client.models.list()`. |
+| | `verifyConnectivity(client, model)` | Function | Asynchronous connection test via `client.models.list()`, falling back to a minimal chat completion probe if the provider does not support model listing. |
 | `loginWizard.ts` | `runLoginWizard(args)` | Function | Entry point for `sonnet --login [provider]`. Handles Google, OpenAI, OpenRouter, Ollama, and Custom provider flows. |
 
 ---
