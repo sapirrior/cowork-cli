@@ -8,4 +8,4 @@ test.js
 package-lock.json
 ./plan.md
 *.tmp.ts
-*tmp.js
+*.tmp.js
