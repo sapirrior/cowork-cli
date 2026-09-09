@@ -1,37 +1,9 @@
 import Component from '../Component.js';
 import stringWidth from 'string-width';
 import { THEME } from '../../theme.js';
+import { wrapByVisualWidth } from '../cell-layout.js';
 
-/**
- * Wraps `text` into lines that do not exceed `maxCols` **display columns**.
- * Unlike a naive `.slice(i, i+n)`, this respects wide Unicode characters
- * (CJK, emoji) so no character is ever split mid-glyph.
- */
-export function wrapByVisualWidth(text: string, maxCols: number): string[] {
-  if (text.length === 0) return [''];
-  if (maxCols <= 0) return [text];
-
-  const lines: string[] = [];
-  let currentLine = '';
-  let currentWidth = 0;
-
-  // Iterate over Unicode codepoints (handles surrogate pairs / emoji)
-  for (const char of text) {
-    const cw = stringWidth(char);
-    if (currentWidth + cw > maxCols && currentLine.length > 0) {
-      lines.push(currentLine);
-      currentLine = char;
-      currentWidth = cw;
-    } else {
-      currentLine += char;
-      currentWidth += cw;
-    }
-  }
-  if (currentLine.length > 0 || lines.length === 0) {
-    lines.push(currentLine);
-  }
-  return lines;
-}
+export { wrapByVisualWidth };
 
 /**
  * Returns the display-column offset of the cursor within `text` up to
@@ -66,6 +38,8 @@ interface InputBoxState {
 }
 
 export default class InputBox extends Component<InputBoxProps, InputBoxState> {
+  private _cachedWrappedContent: string[] = [];
+
   constructor(props: InputBoxProps = {}) {
     super(props);
     this.state = {
@@ -79,25 +53,25 @@ export default class InputBox extends Component<InputBoxProps, InputBoxState> {
   }
 
   /**
-   * Cursor position in the DocumentTree grid.
+   * Cursor position in physical rows relative to this component.
    * Line 0 = label row, line 1 = top border, line 2+ = content lines.
-   * Column offset is 2 (for the "  " prefix) + visual column within the line.
+   * Column offset is 2 (for the "  " prefix) + visual column within the wrapped row.
    */
   override getCursorPosition(): { line: number; column: number } {
     const width = process.stdout.columns || 80;
-    // 2 chars prefix indent inside the box
     const INDENT = 2;
     const maxWidth = Math.max(10, width - 1 - INDENT);
     const { cursorIndex, currentVal, masked } = this.state;
 
     const sub = currentVal.substring(0, cursorIndex);
     const displaySub = masked ? '•'.repeat(sub.length) : sub;
-    const totalVisualOffset = stringWidth(displaySub);
 
-    const cursorLineOffset = Math.floor(totalVisualOffset / maxWidth);
-    const cursorColOffset  = totalVisualOffset % maxWidth;
+    // Use wrapByVisualWidth to determine exact row and remainder within the current line
+    const subWrapped = wrapByVisualWidth(displaySub, maxWidth);
+    const cursorLineOffset = Math.max(0, subWrapped.length - 1);
+    const lastSeg = subWrapped[subWrapped.length - 1] || '';
+    const cursorColOffset = stringWidth(lastSeg);
 
-    // +2 for label row and top-border row above the content area
     return {
       line: 2 + cursorLineOffset,
       column: INDENT + 1 + cursorColOffset   // 1-indexed column
@@ -136,8 +110,8 @@ export default class InputBox extends Component<InputBoxProps, InputBoxState> {
     const displayVal = masked ? '•'.repeat(currentVal.length) : currentVal;
     const INDENT = 2;
     const maxWidth = Math.max(10, width - 1 - INDENT);
-    const wrapped = wrapByVisualWidth(displayVal, maxWidth);
-    for (const wrappedLine of wrapped) {
+    this._cachedWrappedContent = wrapByVisualWidth(displayVal, maxWidth);
+    for (const wrappedLine of this._cachedWrappedContent) {
       lines.push('  ' + wrappedLine);
     }
 

@@ -1,7 +1,7 @@
 import Component from '../Component.js';
 import stringWidth from 'string-width';
 import { THEME } from '../../theme.js';
-import { wrapByVisualWidth } from './InputBox.js';
+import { wrapByVisualWidth } from '../cell-layout.js';
 
 interface FollowUpBoxProps {
   currentVal?: string;
@@ -24,6 +24,8 @@ function greyBorder(width: number): string {
 }
 
 export default class FollowUpBox extends Component<FollowUpBoxProps, FollowUpBoxState> {
+  private _cachedWrappedContent: string[] = [];
+
   constructor(props: FollowUpBoxProps = {}) {
     super(props);
     this.state = {
@@ -39,15 +41,14 @@ export default class FollowUpBox extends Component<FollowUpBoxProps, FollowUpBox
    */
   override getCursorPosition(): { line: number; column: number } {
     const width = process.stdout.columns || 80;
-    // Content columns = total width minus the "> " prefix (no indent)
     const maxContentCols = Math.max(10, width - 1 - PREFIX_COLS);
 
     const { currentVal, cursorIndex } = this.state;
     const sub = currentVal.substring(0, cursorIndex);
-    const totalOffset = stringWidth(sub);
-
-    const cursorLineOffset = Math.floor(totalOffset / maxContentCols);
-    const cursorColOffset  = totalOffset % maxContentCols;
+    const subWrapped = wrapByVisualWidth(sub, maxContentCols);
+    const cursorLineOffset = Math.max(0, subWrapped.length - 1);
+    const lastSeg = subWrapped[subWrapped.length - 1] || '';
+    const cursorColOffset = stringWidth(lastSeg);
 
     return {
       line:   1 + cursorLineOffset,      // line 0 = top border, line 1 = first content line
@@ -73,11 +74,11 @@ export default class FollowUpBox extends Component<FollowUpBoxProps, FollowUpBox
     if (currentVal.length === 0) {
       lines.push(`${prefixStyled}${THEME.formatDim(PLACEHOLDER)}`);
     } else {
-      const contentLines = wrapByVisualWidth(currentVal, maxContentCols);
-      lines.push(`${prefixStyled}${contentLines[0]}`);
-      for (let i = 1; i < contentLines.length; i++) {
+      this._cachedWrappedContent = wrapByVisualWidth(currentVal, maxContentCols);
+      lines.push(`${prefixStyled}${this._cachedWrappedContent[0]}`);
+      for (let i = 1; i < this._cachedWrappedContent.length; i++) {
         // Continuation lines: align text under first line (PREFIX_COLS spaces)
-        lines.push(`${' '.repeat(PREFIX_COLS)}${contentLines[i]}`);
+        lines.push(`${' '.repeat(PREFIX_COLS)}${this._cachedWrappedContent[i]}`);
       }
     }
 

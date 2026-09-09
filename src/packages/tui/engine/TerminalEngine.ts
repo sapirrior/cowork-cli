@@ -259,7 +259,7 @@ export default class TerminalEngine {
   commit(kind: 'log' | 'header' | 'footer' | 'tool-result' | 'assistant-message' | 'raw' | 'logo' | 'prompt', lines: string[]): void {
     this.ensureAlternateScreen();
     this.history.push(kind, lines);
-    this.tree.addText(lines);
+    this.tree.addText(lines, kind !== 'logo');
     this.requestFrame();
   }
 

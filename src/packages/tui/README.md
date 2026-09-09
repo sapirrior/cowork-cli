@@ -1,61 +1,58 @@
-# TUI Package (`@sapirrior/sonnet-cli` — tui)
+# A sub package named tui for Sonnet CLI for rendering terminal interface and layout engine
 
-The `tui` package implements a state-driven, flicker-free, mouse-free terminal rendering engine for Sonnet CLI.
+This package implements a state-driven, flicker-free, mouse-free terminal rendering engine, physical cell layout calculation, differential line updates, and interactive components for Sonnet CLI.
 
-## 🏗️ Architecture
+---
 
-```
-                  +----------------------------------+
-                  |           [UI Layer]             |
-                  +----------------------------------+
-                                   |
-                                   v
-                  +----------------------------------+
-                  |         [DocumentTree]           |
-                  +----------------------------------+
-                                   |
-                                   v
-                  +----------------------------------+
-                  |        [TerminalEngine]          |
-                  +----------------------------------+
-                    | (Alternate Screen: \x1b[?1049h, permanent rawMode)
-                    | lineWidthCache: Map<string,number>
-                    v
-                  +----------------------------------+
-                  |         [StateRenderer]          |
-                  +----------------------------------+
-                    | (Line-diff renderer — only rewrites
-                    |  changed lines; full repaint on resize)
-                    v
-                  +----------------------------------+
-                  |          [FrameBuffer]           |
-                  +----------------------------------+
-```
+## File & Function Breakdown
 
-## 🧩 Engine Modules (`engine/`)
+### Core Modules
 
-| File | Description |
-| :--- | :--- |
-| `DocumentTree.ts` | Owns the ordered tree of `ComponentNode` items. |
-| `FrameBuffer.ts` | Pure viewport computation. Accepts a `lineWidthCache` map so `stringWidth()` is called at most once per unique line string for the lifetime of the process. |
-| `StateRenderer.ts` | **Line-diff renderer.** Keeps a `previousLines` snapshot and only emits cursor-move + text for lines that changed. Uses `\x1b[K` to erase stale trailing characters. Falls back to full clear (`\x1b[H\x1b[J`) only on `forceFull` (resize) or first paint. |
-| `TerminalEngine.ts` | Orchestrates lifecycle, resize, and vim-style keyboard scrolling (`j`/`k`/`g`/`G`/`Ctrl+U`/`Ctrl+D`). Mouse tracking is completely disabled to prevent raw byte leaks. Owns the shared `lineWidthCache`. |
-| `HistoryStore.ts` | Retained-state memory store for all committed session output. |
-| `Component.ts` | Base class. `setState()` batches all updates within the same synchronous tick into a single `requestFrame()` via the `dirty` flag guard. |
+| File | Export / Item | Type | Description |
+| :--- | :--- | :--- | :--- |
+| `index.ts` | `ui` | Export | Facade object exposing high-level UI controls (`log`, `prompt`, `start`, `stop`, `ask`, `askFollowUp`, `confirmTool`, `cleanup`). |
+| | `outputFormatted` | Export | Formats and converts markdown content into ANSI-styled strings. |
+| | `formatPromptQuery` | Export | Formats user prompt queries for display in the terminal. |
+| | `extractThinking` | Export | Extracts thinking blocks and final response text. |
+| | `formatThinkingOnly` | Export | Formats thinking output blocks. |
+| | `StreamingText` | Export | Dynamic text renderer supporting live streaming. |
+| | `isPromptActive` | Export | Returns whether an interactive prompt is currently awaiting user input. |
+| `theme.ts` | `THEME` | Export | Centralized terminal palette definitions and text stylers derived from `config.json`. |
 
-## 🧩 UI Components (`engine/components/`)
+---
+
+## Engine Modules (`engine/` Sub-directory)
+
+| File | Export / Item | Type | Description |
+| :--- | :--- | :--- | :--- |
+| `cell-layout.ts` | `wrapVisualLine` / `wrapByVisualWidth` | Function | Unicode-safe and ANSI-safe word wrapper preserving escape sequences across physical row boundaries. |
+| | `measureNode` | Function | Measures a `ComponentNode` and breaks its logical lines into physical rows and local cursor offsets. |
+| | `layoutDocument` | Function | Lays out the complete `DocumentTree` into flat physical rows and absolute `CellCursor`. |
+| `DocumentTree.ts` | `DocumentTree` | Class | Manages the ordered tree of components and historical entries. |
+| | `TextNode` | Class | Stored static line node supporting dynamic re-wrapping via `wrappable` flag and memoized `getLines(width)`. |
+| `FrameBuffer.ts` | `computeDocumentFrame` | Function | Pure viewport computation operating on physical rows. Guarantees 1 line in `DocumentFrame` = 1 physical terminal row. |
+| `StateRenderer.ts` | `StateRenderer` | Class | Line-diff renderer that rewrites only modified lines and avoids full-screen clears except during resize events. |
+| `TerminalEngine.ts` | `TerminalEngine` | Class | Coordinates the alternate screen buffer (`\x1b[?1049h`), raw mode, vim-style keyboard scrolling, resize handling, and history flushing on exit. |
+| `HistoryStore.ts` | `HistoryStore` | Class | Retained-state memory store for committed session logs and exit-flush lines. |
+| `Component.ts` | `Component` | Class | Base class for UI components with batched frame requests and dirty-checking. |
+
+---
+
+## UI Components (`engine/components/` Sub-directory)
 
 | Component | Description |
 | :--- | :--- |
 | `Spinner.ts` | Animated spinner with rotating thought phrases. |
-| `InputBox.ts` | Text input widget with Unicode-safe cursor tracking and wrapping (`wrapByVisualWidth`). |
+| `InputBox.ts` | Text input widget with Unicode-safe and ANSI-safe cursor tracking and wrapping. |
 | `SelectionList.ts` | Arrow-key navigable selection list. |
 | `ProviderSelector.ts` | Provider login selector. |
-| `ToolConfirmationCard.ts` | Lean, interactive tool confirmation card with yellow left border and keybindings (`y`/`n`/`Enter`/`Esc`/`Tab`/`Ctrl+Y`/`Ctrl+N`/`Ctrl+E`/Arrow keys). |
+| `ToolConfirmationCard.ts` | Lean, interactive tool confirmation card with yellow left border and keybindings. |
 | `StreamingText.ts` | Dynamic text renderer supporting live streaming with real-time thinking extraction. |
-| `FollowUpBox.ts` | Follow-up input box with thin grey borders (`> ` at left edge), dim placeholder when empty, footer hints, and exact `stringWidth(substring)` cursor math matching `InputBox`. |
+| `FollowUpBox.ts` | Follow-up input box with thin grey borders (`> ` at left edge), placeholder, and consolidated wrap cursor math. |
 
-## ⌨️ Input Keybindings (`ui/prompt.ts`)
+---
+
+## Supported Input Keybindings (`ui/prompt.ts`)
 
 Both `ask()` and `askFollowUp()` share a single `handleInputKey()` function supporting:
 
@@ -71,29 +68,14 @@ Both `ask()` and `askFollowUp()` share a single `handleInputKey()` function supp
 | Enter | Submit input |
 | `Ctrl+C` | Cancel prompt |
 
-## 🚀 Usage
+---
 
-```typescript
-import { ui } from './ui/main.js';
-
-// Tool confirmation with content showcase preview
-const { confirmed } = await ui.confirmTool({
-  toolName: 'writeFile',
-  action: 'Create file',
-  target: 'src/utils/helper.ts (10 lines)',
-  details: ['export function test() { return true; }'],
-});
-
-// Ask for user follow-up inline using FollowUpBox
-const query = await ui.askFollowUp();
-```
-
-## 📜 Terminal Invariants & Safety
+## Terminal Invariants & Safety
 
 1. **Alternate Screen**: Interactive components run inside `\x1b[?1049h`. Permanent rawMode is enabled during alternate screen mode.
 2. **Line-diff rendering**: `StateRenderer` never clears the full screen unless `forceFull` is set (resize events). Only changed lines are rewritten, eliminating flicker during spinner ticks and streaming.
 3. **Width cache**: `TerminalEngine` owns a single `Map<string, number>` for `stringWidth` results. History lines are immutable so cache entries are permanent and never need eviction.
-4. **Unicode-safe slicing**: All text wrapping in `InputBox` and `FollowUpBox` uses `wrapByVisualWidth()`, which iterates codepoints and respects wide characters (CJK, emoji) — no byte-offset slicing.
+4. **Unicode-safe slicing**: All text wrapping in `InputBox`, `FollowUpBox`, and `cell-layout.ts` uses `wrapVisualLine()` / `wrapByVisualWidth()`, which iterates codepoints and respects wide characters (CJK, emoji) without splitting escape sequences.
 5. **Batched frames**: `Component.setState()` always calls `engine.requestFrame()` but the `dirty` flag guard ensures multiple `setState()` calls within the same synchronous event produce exactly one repaint on the next tick.
 6. **Zero Mouse Tracking**: All mouse tracking escape sequences (`?1000h`/`1002h`/`1006h`/`1007h`) are completely removed to prevent Termux stdin corruption.
 7. **History Flush**: On exit, CLI flushes `HistoryStore` to primary scrollback (omitting `logo` and `prompt` entries).
